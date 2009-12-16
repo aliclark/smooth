@@ -1,0 +1,18 @@
+
+(import smooth-lang/anc2020/lambda)
+
+(: if    id)
+(: false drop)
+(: true  drop2)
+(: and   tuck2)
+(: or    dup)
+(: not   fswap)
+(: xor   fxor)
+(: nor   fcompose not or)
+(: xnor  fcompose not xor)
+(: and4  f2to4 and)
+(: !     not)
+(: ¬     not)
+(: &&    and)
+(: ||    or)
+(: ?     if)

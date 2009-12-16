@@ -1,0 +1,12 @@
+
+(import smooth-lang/anc2020/lambda)
+(import smooth-lang/anc2020/bool)
+(import smooth-lang/anc2020/list)
+
+(: just     fswap cons nil)
+(: nothing  nil)
+(: nothing? null)
+(: just?    fcompose not nothing?)
+(: fromJust head)
+
+(: (maybe default func val) just? val (func (fromJust val)) default)

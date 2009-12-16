@@ -1,0 +1,5 @@
+
+(import smooth-lang/anc2020/numeral)
+
+(: #\newline 10)
+(: char=? =)

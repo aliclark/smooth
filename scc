@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# First we have to find the formal C dependancy files
+# The hard part is we then have to find out the informal dependacies
+# and I'm not sure how to do that, but the plugin developer needs to specify it somewhere
+
+DEPS=(smoothlang/anc2020/numeral.c smoothlang/anc2020/iochar.c smoothlang/anc2020/iocons.c)
+
+# Shouldn't be too hard to get this one though
+OUTNAME=test
+
+./src/compiler.scm $1 | gcc -o $OUTNAME -I. -xc ${@:2} ${DEPS[@]} smoothlang/anc2020/linkedarray/ali_memory.c smoothlang/anc2020/linkedarray/ali_linked_array.c -

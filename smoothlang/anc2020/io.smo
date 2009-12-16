@@ -1,0 +1,34 @@
+
+(import  smooth-lang/anc2020/lambda)
+(import  smooth-lang/anc2020/pair)
+(import  smooth-lang/anc2020/numeral)
+(import  smooth-lang/anc2020/char)
+(import  smooth-lang/anc2020/monad)
+
+(include smooth-lang/anc2020/io - stdin stdout hGetChar hPutChar)
+(include smoothlang/anc2020/iocons  (iocons_car 1) (iocons_cdr 1))
+(include smoothlang/anc2020/numeral (numeral_to_ulint 1))
+(include smoothlang/anc2020/iochar  (cputchar 2))
+
+(: run       fcompose snd (applies 0))
+(: return    pair)
+(: (>>= m f) fcompose (uncurry f) m)
+(: >>        make->> >>=)
+(: sequence_ make-sequence_ >> return)
+(: mapM_     make-mapM_ sequence_)
+
+(: (hGetLine h)
+  >>= (hGetChar h)
+    (fcompose
+      (\ c
+        (if (char=? c #\newline) (return nil)
+          (>>= (hGetLine h) (\ l (return (cons c l))))))
+      cint_to_numeral))
+
+(: getChar         hGetChar  stdin)
+(: getLine         hGetLine  stdin)
+(: hPutStr         fcompose mapM_ hPutChar)
+(: (hPutStrLn h s) >> (hPutStr h s) (hPutChar h #\newline))
+(: putChar         hPutChar  stdout)
+(: putStr          hPutStr   stdout)
+(: putStrLn        hPutStrLn stdout)

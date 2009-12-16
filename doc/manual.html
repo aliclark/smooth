@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style type="text/css">
+    <!--
+
+html,
+body {
+  color: #222;
+  background-color: #fcfcfc;
+  margin: 0;
+  padding: 0;
+}
+
+h2 {
+  margin-top: 40px;
+  border-bottom: 2px solid;
+}
+
+h3 {
+  border-bottom: 1px solid;
+}
+
+code {
+  background-color: #eee;
+}
+
+pre {
+  padding: 5px;
+  background-color: #eee;
+}
+
+.section {
+  padding: 5px;
+  margin-top: 5px;
+}
+
+.title,
+.logo {
+  text-align: center;
+}
+
+    -->
+    </style>
+    <title>Smooth - The Manual</title>
+  </head>
+  <body>
+    <h1 class="title">Smooth - The Manual</h1>
+<pre class="logo">
+&#160;_______&#160;&#160;
+|       |\
+: HYMNS ||
+| BOOKE ||
+|   \   ||
+:   /\  ||
+|_______||
+(________\
+
+</pre>
+    <div class="section" id="contents">
+      <h2>Contents</h2>
+      <ul>
+	<li>
+	  <a href="#reading">Reading</a>
+	  <ul>
+	    <li><a href="#the-syntax">The Syntax</a></li>
+	    <li><a href="#read-macros">Read Macros</a></li>
+	    <li><a href="#indentation">Indentation</a></li>
+	  </ul>
+	</li>
+	<li>
+	  <a href="#expanding">Expanding</a>
+	  <ul>
+	    <li><a href="#the-special-forms">The Special Forms</a></li>
+	    <li><a href="#macros">Macros</a></li>
+	  </ul>
+	</li>
+	<li>
+	  <a href="#evaluating">Evaluating</a>
+	  <ul>
+	    <li><a href="#primitive-operations">Primitive Operations</a></li>
+	    <li><a href="#the-evaluation-model">The Evaluation Model</a></li>
+	  </ul>
+	</li>
+	<li>
+	  <a href="#the-program-model">The Program Model</a>
+	  <ul>
+	    <li><a href="#code-structure">Code Structure</a></li>
+	    <li><a href="#library-structure">Library Structure</a></li>
+	  </ul>
+	</li>
+	<li>
+	  <a href="#running-code">Running Code</a>
+	  <ul>
+	    <li><a href="#compiling">Compiling</a></li>
+	    <li><a href="#interpreting">Interpreting</a></li>
+	  </ul>
+	</li>
+      </ul>
+    </div>
+    <div class="section" id="reading">
+      <h2>Reading</h2>
+      <div class="section" id="the-syntax">
+        <h3>The Syntax</h3>
+	<p>The characters <code>(</code>, <code>)</code>, <code>#</code>, <code>\space</code>, <code>\n</code>, and <code>\t</code> affect the parser.</p>
+	<p>
+	  Open parenthesis starts a list. Close parenthesis ends the most recently opened list. Hash is the read macro dispatch character. Space, newline, and tab are whitespace characters.
+        </p>
+	<p>
+	  Smooth programs are made of just lists and symbols. Lists may contain any number and combination of lists and symbols, but must not be empty.
+        </p>
+      </div>
+      <div class="section" id="read-macros">
+	<h3>Read Macros</h3>
+	<p>
+	  After a hash character is seen, the next character is used to identify the macro to dispatch to. From then on that macro has control of the read procedure and may return the resulting expression once it has finished reading.
+        </p>
+	<p>
+	  A symbol is any sequence of contiguous characters between the special parser characters and may include non-alphanumeric and unicode characters.
+        </p>
+	<p>
+	  The parser exposes an API to allow the end-user to supply their own read dispatch macros.
+        </p>
+	<p>
+	  Read dispatch macros only return symbols and lists like normal code, and specifically intended to automatically generate dynamic data values easily. So eg. dispatch for <code>#0</code> to <code>#9</code> allows arbitrarily large values to be generated, such as <code>#4589323</code>
+        </p>
+      </div>
+      <div class="section" id="indentation">
+	<h3>Indentation</h3>
+	<p>
+	  On top of these rules, lists can also be automatically generated on indentation.
+	</p>
+	<p>
+	  If two or more symbols appear on the same line, they are automatically formed into a list.
+	</p>
+	<p>eg.</p>
+	<pre>sym1 sym2</pre>
+	<p>
+	  becomes
+	</p>
+	<pre>(sym1 sym2)</pre>
+	<p>
+	  If any value is indented from one or more values on the line before it, the value on the line below is included with the value(s) of the line above in a list.
+	</p>
+	<p>eg.</p>
+<pre>
+baz bar
+  foo fizz
+</pre>
+	<p>becomes</p>
+<pre>
+(baz bar
+  (foo fizz))
+</pre>
+      </div>
+    </div>
+    <div class="section" id="expanding">
+      <h2>Expanding</h2>
+      <div class="section" id="the-special-forms">
+	<h3>The Special Forms</h3>
+	<p>
+	  Definition of "Expression":
+	  An expression may be a lambda form, a symbol, or a list with a lambda at its head and arguments to be supplied to the lambda as the rest of the list.
+	</p>
+	<p>
+	  There are two special forms, the lambda form, and the define form.
+	</p>
+	<p>
+	  lambda forms are lists with a backslash symbol <code>\</code> as their first element.
+	</p>
+	<p>eg.</p>
+	<pre>(\ x x)</pre>
+	<p>
+	  define forms are lists with a colon symbol symbol <code>:</code> as their first element.
+	</p>
+	<p>eg.</p>
+	<pre>(: bob foo)</pre>
+	<p>
+	  define forms can only appear at the top level of the program, whilst lambda forms can only appear within other define or lambda forms.
+	</p>
+	<p>
+	  At its most basic level, a lambda form is a list with the lambda symbol <code>\</code> first, then a symbol representing the argument name for the function, then finally an expression to be evaluated in the context of that argument.
+	</p>
+	<p>
+	  At its most basic level, a define form is a list with the define symbol <code>:</code> first, then a symbol representing the variable to be defined, then finally an expression which the variable will now name.
+	</p>
+	<p>
+	  The lambda form can however take a list of variable names as the second part of the form, in which case it is equivalent to nested lambda forms each binding one of the variables,
+	</p>
+	<p>eg.</p>
+	<pre>(\ (x y z) z)</pre>
+	<p>becomes</p>
+	<pre>(\ x (\ y (\ z z)))</pre>
+	<p>
+	  The define form can also take a list as its second argument, in which case the head of that list is taken to be the variable name being defined, and the rest of that list is taken to be a list of arguments to a lambda expression being bound,
+	</p>
+	<p>eg.</p>
+	<pre>(: (f x y) y)</pre>
+	<p>becomes</p>
+	<pre>(: f (\ x (\ y y)))</pre>
+      </div>
+      <div class="section" id="macros">
+	<h3>Macros</h3>
+	<p>
+	  The compiler exposes an API to allow the user to define new language forms by combining the existing forms programmatically. In addition to the 2 special forms above, the <code>begin</code> special form is provided to aid in macro writing.
+	</p>
+	<p>
+	  The <code>begin</code> special form merely allows zero or more define statements to be grouped into a single statement,
+	</p>
+	<p>eg.</p>
+<pre>
+(begin
+  (: (id x) x)
+  (: (drop x y) y))
+</pre>
+        <p>
+	  This allows a user-defined macro to return code containing multiple define statements to the top level.
+	</p>
+	<p>
+	  An example of a valid use for macros is the <code>list</code> macro, which takes its arguments and rewrites them in terms of the <code>cons</code> function and <code>nil</code>,
+	</p>
+	<p>eg.</p>
+	<pre>(list 1 2 3)</pre>
+	<p>becomes</p>
+	<pre>(cons 1 (cons 2 (cons 3 nil)))</pre>
+	<p>This is useful since macros are allowed variable arity, unlike lambda forms.</p>
+      </div>
+    </div>
+    <div class="section" id="evaluating">
+      <h2>Evaluating</h2>
+      <div class="section" id="primitive-operations">
+	<h3>Primitive Operations</h3>
+	<p>
+	  The user may indicate to the compiler that a definition for a function is internal to the compiler and is not defined using Smooth. This is done may naming the function in a <code>.prims</code> file, and adding the file to the dependancies list.
+	</p>
+	<p>
+	  Calls to such functions cannot be reduced during compilation, and are left until run-time, when the compiled program is executed, before they are run.
+	</p>
+      </div>
+      <div class="section" id="the-evaluation-model">
+	<h3>The Evaluation Model</h3>
+	<p>
+	  Evaluation in Smooth is a process of simplifying expressions. A compiler will try to simplify expressions in the program as much as possible, but there are a couple of reasons why an expression may not be simplifiable in the compiler.
+	</p>
+	<p>
+	  Firstly, the expression may already be a lambda in its simplest form. In this case simplification is complete.
+	</p>
+	<p>
+	  Alternatively we may have reached a function name that cannot be reduced further. This is possible when the function name is that of a primitive operation, or when the function being named is defined recursively.
+	</p>
+	<p>
+	  Strict expansion of lambda expressions via Alpha conversion until reach recursion or primitive operations. The lazy evaluation after that.
+	</p>
+	<p>
+	  Expressions are evaluated at run-time using a call-by-need strategy in the presence of tail call optimization. Stack overflow exceptions must not happen whilst there is still memory available in the system. Instead, extra memory must be claimed for use in the stack. Only when memory is completely consumed may an exception be thrown. The program will be terminated immediately upon running out of memory.
+	</p>
+	<p>
+	  No other errors are permitted in Smooth. eg. 1/0 does not cause an exception, but instead a special value indicating that 1/0 was attempted.
+	</p>
+      </div>
+    </div>
+    <div class="section" id="the-program-model">
+      <h2>The Program Model</h2>
+      <div class="section" id="code-structure">
+	<h3>Code Structure</h3>
+	<p>
+	  There are two ways that code can be compiled - as a program, or as a library.
+	</p>
+	<p>
+	  The language assumes whole program compilation, whereby definitions for everything except primitive operations are know at compile time. For a program to be executable, it must define a value to the variable named <code>main</code>.
+	</p>
+      </div>
+      <div class="section" id="library-structure">
+	<h3>Library Structure</h3>
+	<p>Files are seen as libraries.</p>
+<pre>
+host/user/*
+  file_version.smo
+  file_version.slo   -- intermediate file format for Smooth code libraries
+  file_version.c
+  file_version.o
+  file_version.macs  -- file containing code for the compiler
+  file_version.prims -- list of lines naming the primitive operation functions
+  file_version.deps  -- list of lines in form of: host/user/file
+</pre>
+	<p>eg.</p>
+<pre>
+smooth-lang/anc2020/
+  lambda_1.smo
+  bool_1.smo
+  bool_1.deps  # smooth-lang/anc2020/lambda_1
+  pair_1.smo
+  pair_1.deps  # smooth-lang/anc2020/bool_1
+</pre>
+	<p>
+	  Now all we need is some kind of sync list for each host. This keeps all the deps files up to date.
+	</p>
+	<p>
+	eg.
+If <code>lambda_1</code> got updated so there is now a <code>lambda_2</code>,
+and <code>bool_1</code> stayed the same but wanted to use <code>lambda_2</code>, <code>bool_1.deps</code> would be updated.
+Now when the user syncs their <code>smooth-lang</code> libs, they will recompile <code>bool_1</code>
+and any of their libs that depended on <code>bool_1</code>, ie. <code>pair_1</code> etc.
+	</p>
+	<p>
+	  But there should also be a bug fix mode where version numbers do not change, so all libraries affected update automatically.
+	</p>
+	<p>
+	  Circular dependancies in libraries are not permitted. If file A depends on file B and file B depends on file A, then a 3rd file must be created which contains the part of A that depends on B and/or the part of B that depends on A, and with the new file depending on both A and B.
+	</p>
+      </div>
+    </div>
+    <div class="section" id="running-code">
+      <h2>Running Code</h2>
+      <div class="section" id="compiling">
+	<h3>Compiling</h3>
+	<p>Foo bar</p>
+      </div>
+      <div class="section" id="interpreting">
+	<h3>Interpreting</h3>
+	<p>Baz</p>
+      </div>
+    </div>
+
+smoothc -m main -c file-a.smo -d file-b.slo file-c.slo -p file-d.prims
+
+smcc file-a.smo
+
+  </body>
+</html>

@@ -1,0 +1,15 @@
+
+(import smooth-lang/anc2020/list)
+(import smooth-lang/anc2020/numeral)
+(import smooth-lang/anc2020/bool)
+(import smooth-lang/anc2020/macros)
+
+(: (shaves x y)
+  if (and (= x 1) (= y 1)) true
+    (if (and (= x 2) (= y 2)) false
+      (if (= x 0) (not (shaves y y))
+        false)))
+
+(: (baz x y) not (baz y y))
+
+(: main run (putChar (numeral_to_uint (++ (* 8 4)))))

@@ -1,0 +1,14 @@
+
+(import smoothlang/anc2020/bool)
+(import smoothlang/anc2020/list)
+(import smoothlang/anc2020/numeral)
+(import smoothlang/anc2020/string)
+
+(: startup true)
+
+(: exports
+  list
+    (list #"stdin"  0)
+    (list #"stdout" 0)
+    (list #"getc"   2)
+    (list #"putc"   3))

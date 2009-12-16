@@ -1,0 +1,32 @@
+
+(import smooth-lang/anc2020/pair)
+(import smooth-lang/anc2020/bool)
+(import smooth-lang/anc2020/lambda)
+(import smooth-lang/anc2020/numeral)
+
+(: (cons h t) pair false (pair h t))
+(: nil        fdup pair true)
+(: null       fst)
+(: null?      null)
+(: sat        fcompose not null)
+(: head       fcompose fst snd)
+(: tail       fdup fcompose snd)
+(: car        head)
+(: cdr        tail)
+(: cadr       fcompose car cdr)
+(: caddr      fcompose cadr cdr)
+
+(: (equal a b)
+  or (and (null a) (null b))
+    (and4 (sat a) (sat b) (equal (head a) (head b)) (equal (tail a) (tail b))))
+
+(: (foldr f z xs) null? xs z   (f (head xs) (foldr f z (tail xs))))
+(: (map f xs)     null? xs xs  (cons (f (head xs)) (map f (tail xs))))
+(: (append xs ys) null? xs ys  (cons (head xs) (append (tail xs) ys)))
+(: (take n xs)	  zero? n  nil (cons (head xs) (take (-- n) (tail xs))))
+(: (reverse xs)   null? xs nil (append (reverse (tail xs)) (cons (head xs) nil)))
+
+(: (last l)    null? (tail l) (head l) (last (tail l)))
+(: (butlast l) null? (tail l) nil      (cons (head l) (butlast (tail l))))
+
+(: (infinity-of x) cons x (infinity-of x))
