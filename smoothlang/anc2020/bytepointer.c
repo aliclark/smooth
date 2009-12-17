@@ -1,3 +1,4 @@
+/* (depends smoothlang_anc2020_iocons) */
 
 /*
  * Copyright (c) 2009, Ali Clark <emailaliclark@gmail.com>
@@ -16,7 +17,9 @@
  */
 
 #include "smoothlang/anc2020/smooth.h"
-#include "smoothlang/anc2020/iocons.h"
+
+#define iocons smoothlang_anc2020_iocons__iocons
+smooth_t iocons (smooth_t x, smooth_t y);
 
 smooth_t smoothlang_anc2020_bytepointer__setbyte (smooth_t addr, smooth_t byte, smooth_t z) {
   *((unsigned char*) addr) = byte;
