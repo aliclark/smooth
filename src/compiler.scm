@@ -1127,19 +1127,24 @@ int main (" (if (null? (get-init-mods)) "void" "const int argc, const char** con
 
 (: (primop-path-to-c p) (string-replace p "/" "_"))
 
+(: (add-primops! h)
+  (map
+    (lambda (x)
+      (map
+        (lambda (y)
+          (let ((name (if (list? y) (car y) y))
+                (arity (if (list? y) (cadr y) '0)))
+            (table-set! primops name
+              (cons (primop-path-to-c (symbol->string (car x)))
+                (string->number (symbol->string arity))))))
+        (cdr x)))
+    (the-primops h)))
+
 (: (compile-entry x)
   (let* ((a (read-all (smooth-path-to-codefile x)))
          (h (code-header a)))
     ;; Add the primops.
-    (map
-      (lambda (x)
-        (map
-          (lambda (y)
-            (table-set! primops (car y)
-              (cons (primop-path-to-c (symbol->string (car x)))
-                (string->number (symbol->string (cadr y))))))
-          (cdr x)))
-      (the-primops h))
+    (add-primops! h)
     (let ((c (expand-statements nil (code-forms  a))))
 
       (if (has-main-sym? c)
