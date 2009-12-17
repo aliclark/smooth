@@ -718,15 +718,24 @@
 ;;;((a b) c)
 ;(iocons_cdr ((cputchar (numeral_to_ulint '+')) 1))
 
+; (((cputc stdout)
+;  (numeral_to_ulint 8))
+;  9)
+
 (: (re-aritise-head-depth e) (if (list? e) (+ (re-aritise-head-depth (car e)) 1) 0))
 (: (re-aritise-head-arity e) (if (list? e) (re-aritise-head-arity (car e)) (primop-arity e)))
+
+(: (re-aritise-flatten x)
+  (if (list? (car x))
+    (append (re-aritise-flatten (car x)) (list (re-aritise (cadr x))))
+    (list (car x) (re-aritise (cadr x)))))
 
 (: (re-aritise e)
   (if (list? e)
     (append
       (if (list? (car e))
         (if (< (re-aritise-head-depth (car e)) (re-aritise-head-arity (car e)))
-          (car e)
+          (re-aritise-flatten (car e))
           (list (car e)))
         (list (car e)))
       (list (re-aritise (cadr e))))
