@@ -1133,7 +1133,7 @@ int main (" (if (null? (get-init-mods)) "void" "const int argc, const char** con
       (map
         (lambda (y)
           (let ((name (if (list? y) (car y) y))
-                (arity (if (list? y) (cadr y) '0)))
+                (arity (if (list? y) (cadr y) (string->symbol "0"))))
             (table-set! primops name
               (cons (primop-path-to-c (symbol->string (car x)))
                 (string->number (symbol->string arity))))))
