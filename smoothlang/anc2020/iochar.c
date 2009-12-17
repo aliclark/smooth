@@ -1,4 +1,4 @@
-/* (depends smoothlang/anc2020/iocons smoothlang/anc2020/numeral ) */
+/*SMOOTH (depends smoothlang/anc2020/iocons smoothlang/anc2020/numeral ) */
 
 /*
  * Copyright (c) 2009, Ali Clark <emailaliclark@gmail.com>
@@ -18,11 +18,8 @@
 
 #include "smoothlang/anc2020/smooth.h"
 
-#define iocons           smoothlang_anc2020_iocons__iocons
-#define ulint_to_numeral smoothlang_anc2020_numeral__ulint_to_numeral
-
+#define  iocons smoothlang_anc2020_iocons__iocons
 smooth_t iocons (smooth_t, smooth_t);
-smooth_t ulint_to_numeral (smooth_t);
 
 #include <stdio.h> /* Needed for definition of typedef FILE or stdin,stdout */
 

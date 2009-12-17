@@ -19,33 +19,25 @@
 
 #define NULL 0
 
-static smooth_t numeral_addone    (void);
-static smooth_t numeral_numeral_x (void);
-static smooth_t numeral_numeral_f (void);
-
-static smooth_t numeral_addone (void) {
-  return SMOOTH_POP() + 1;
+static smooth_t numeral_addone (smooth_t x) {
+  return x + 1;
 }
 
-static smooth_t numeral_numeral_x (void) {
-  smooth_closure_t* self = (smooth_closure_t*) SMOOTH_POP();
+static smooth_t numeral_numeral_x (smooth_closure_t* self, smooth_t local) {
   smooth_t depth;
-
-  /* x is now TOS. */
+  SMOTH_PUSH(local);
   for (depth = self->parent->local; depth > 0; --depth) {
     SMOOTH_CALL(self->local);
   }
   return SMOOTH_POP();
 }
 
-static smooth_t numeral_numeral_f (void) {
-  smooth_closure_t* self = (smooth_closure_t*) SMOOTH_POP();
-  return SMOOTH_CLOSURE_CREATE(numeral_numeral_x, SMOOTH_POP(), self);
+static smooth_t numeral_numeral_f (smooth_closure_t* self, smooth_t local) {
+  return SMOOTH_CLOSURE_CREATE(numeral_numeral_x, local, self);
 }
 
-/*
-
-This is our optimisation function (lambda -> C-code | null)
+/* This is our optimisation function (lambda -> C-code | null) */
+/*SMOOTH
 
 (: (smoothlang_anc2020_numeral__numeral_to_ulint x) (cquote "0"))
 
