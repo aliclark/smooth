@@ -396,6 +396,13 @@
     xs
     (cons (expand-single-apps (butlast xs)) (cons (last xs) nil))))
 
+;; Here we create a lambda of the same arity as the primop to ensure that
+;; the primop is always called only when it has the right no. of args.
+(: (expand-primop-arity tmp n)
+  (if (zero? n) tmp
+    (let ((newvar (gensym)))
+      (list fn-gen-sym newvar (expand-primop-arity (list tmp newvar) (- n 1))))))
+
 (: (expand-expression shadow-list thing)
   (let ((ex (macroexpand shadow-list thing)))
     (if (null? ex)
@@ -406,9 +413,11 @@
           (expand-fn shadow-list ex)
           (if (list? ex)
             (expand-single-apps (map (partial expand-expression shadow-list) ex))
-            (if (or (keyword-is-shadowed? ex shadow-list) (is-primop? ex))
+            (if (or (keyword-is-shadowed? ex shadow-list))
               ex
-              (error "Unbound variable: " ex))))))))
+              (if (is-primop? ex)
+                (expand-primop-arity ex (primop-arity ex))
+                (error "Unbound variable: " ex)))))))))
 
 ;; (def (f xs...) exp...) -> (def f (fn (xs...) (exp...)))
 (: (expand-def thing)
