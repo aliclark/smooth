@@ -810,10 +810,6 @@ int main (void) { return EXIT_SUCCESS; }
 
 #define SMOOTH_CLOSURE_CAST(a) ((smooth_closure_t*) a)
 
-#define SMOOTH_CALL_PRIMITIVE(fn) SMOOTH_PUSH(((smooth_t (*)(void)) fn)())
-#define SMOOTH_CALL_LAMBDA(x)     smooth_call_lambda(x)
-#define SMOOTH_CALL_CLOSURE(x)    smooth_call_closure(x)
-
 /* Generate macros here to call primops of various aritys */
 #define PRIMCALL_1(fn) SMOOTH_TOS() = fn(SMOOTH_TOS())
 #define PRIMCALL_2(fn) smooth_sp -= 1; SMOOTH_TOS() = fn(SMOOTH_SPOFF(0), SMOOTH_TOS())
@@ -889,22 +885,29 @@ I'm not sure that we would ever want a closure as the code part.
 */
 static void smooth_call_closure (smooth_t x) {
   smooth_t code = SMOOTH_CLOSURE_CODE(x);
-  SMOOTH_PUSH(x);
+  smooth_t local;
   if (SMOOTH_LAMBDA_P(code)) {
+    SMOOTH_PUSH(x);
     smooth_pc = code;
     smooth_execute();
   } else {
-    SMOOTH_CALL_PRIMITIVE(code);
+    local = SMOOTH_POP();
+    SMOOTH_PUSH(((smooth_t (*)(smooth_closure_t*, smooth_t)) fn)((smooth_closure_t*) x, local));
   }
+}
+
+static void smooth_call_primitive (smooth_t fn) {
+  smooth_t local = SMOOTH_POP();
+  SMOOTH_PUSH(((smooth_t (*)(smooth_t)) fn)(local));
 }
 
 void smooth_call (smooth_t x) {
   if (SMOOTH_CLOSURE_P(x)) {
-    SMOOTH_CALL_CLOSURE(x);
+    smooth_call_closure(x);
   } else if (SMOOTH_LAMBDA_P(x)) {
-    SMOOTH_CALL_LAMBDA(x);
+    smooth_call_lambda(x);
   } else {
-    SMOOTH_CALL_PRIMITIVE(x);
+    smooth_call_primitive(x);
   }
 }
 
