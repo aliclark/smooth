@@ -997,7 +997,13 @@ int main (" (if (null? (get-init-mods)) "void" "const int argc, const char** con
 #endif
 "
 (instructions-string (append tv (cddr (car tc))) false)
-"  return EXIT_SUCCESS;
+
+"
+
+  while (0 /* Use this space to ask modules if they are still working */) { }
+  /* Use this space to call module finisher functions */
+
+  return EXIT_SUCCESS;
 }
 
 ")))
