@@ -26,15 +26,16 @@
 (: 42              + 10 (+ 10 (+ 10 (+ 10 2))))
 (: 43              ++ 42)
 
-(: 100              (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 10))))))))))
+(: 100             (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 10))))))))))
 
-(: '*' 42)
-(: '+' 43)
 
-(: h (+ 100 4))
-(: e (+ 100 1))
-(: l (+ 100 8))
-(: o (+ 100 (+ 10 1)))
+(: '*'  42)
+(: '+'  43)
+(: 'h'  (+ 100 4))
+(: 'e'  (+ 100 1))
+(: 'l'  (+ 100 8))
+(: 'o'  (+ 100 (+ 10 1)))
+(: '\n' 10)
 
 
 (: (pair x y z) z x y)
@@ -48,6 +49,7 @@
 (: (head x)   fst (snd x))
 (: (tail x)   snd (snd x))
 
+
 (: (foldr f z xs) null? xs z (f (head xs) (foldr f z (tail xs))))
 (: (map f xs)     null? xs xs  (cons (f (head xs)) (map f (tail xs))))
 
@@ -57,8 +59,9 @@
 
 
 (: (return x r) (iocons x r))
-(: sequence_ make-sequence_ >> return)
-(: mapM_     make-mapM_ sequence_)
+(: sequence_    make-sequence_ >> return)
+(: mapM_        make-mapM_ sequence_)
+
 
 (: (run m)           m 0)
 (: (bindhelper f v1) f (iocons_car v1) (iocons_cdr v1))
@@ -66,19 +69,20 @@
 (: (>>  m1 m2)       >>= m1 (\ x m2))
 
 
-(: (putcc s c r)    cputc s c (++ r))
-(: (putc  s c r)    putcc s (numeral_to_ulint c) r)
-
-(: putchar putc stdout)
+(: (putcc s c r)   cputc s c (++ r))
+(: (putc  s c r)   putcc s (numeral_to_ulint c) r)
+(: putchar         putc stdout)
 
 (: (rewrap-getc i) iocons (ulint_to_numeral (iocons_car i)) (iocons_cdr i))
 (: (getcc s r)     cgetc s (++ r))
 (: (getc  s r)     rewrap-getc (getcc s r))
+(: getchar         getc stdin)
 
-(: getchar getc stdin)
+(: (puts f s)      mapM_ (putc f) s)
+(: putstr          puts stdout)
 
-(: (puts f s)       mapM_ (putc f) s)
-(: (putstr s)       mapM_ putchar s)
+(: (putsln f s)    >> (puts f) (putc f '\n'))
+(: putstrln        putsln stdout)
 
 
-(: main              run (putstr (cons h (cons e (cons l (cons l (cons o nil)))))))
+(: main            run (putstrln (cons 'h' (cons 'e' (cons 'l' (cons 'l' (cons 'o' nil)))))))

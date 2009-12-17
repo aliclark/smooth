@@ -16,7 +16,9 @@
  */
 
 #include "smoothlang/anc2020/smooth.h"
-#include "smoothlang/anc2020/iocons.h"
+
+#define  iocons smoothlang_anc2020_iocons__iocons
+smooth_t iocons (smooth_t, smooth_t);
 
 int   system (const char* s);
 char* getenv (const char* s);

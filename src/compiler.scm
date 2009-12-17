@@ -65,6 +65,11 @@
 ;;;;
 
 
+; TODO: Instead of making the user specify the arity of C functions, parse the C code and find out
+; TODO: Find out whether to run init by checking if the name is present in the C code.
+; TODO: Add read syntax
+; TODO: Add multi file compilation
+; TODO: Add let binding compilation on function calls
 
 ;So we have some basic code working. What next?
 ;
@@ -265,6 +270,7 @@
 (: (n-of x n) (if (= n 0) nil (cons x (n-of x (- n 1)))))
 
 (: (every pred v) (if (null? v) #t (and (pred (car v)) (every pred (cdr v)))))
+(: (any   pred v) (if (null? v) #f (or  (pred (car v)) (any pred (cdr v)))))
 
 (: (listndeep cpy it n) (if (= n 0) it (list cpy (listndeep cpy it (- n 1)))))
 
@@ -766,7 +772,9 @@
 
 (: (get-arity p) (if (eq? p 'hPutChar) 4 (if (eq? p 'numeral_to_uint) 1 0)))
 
-(: (get-init-mods) '())
+(: (get-init-mods)  (list '("smoothlang_anc2020_iochar")))
+(: (get-close-mods) '())
+(: (init-mods-values) (any (lambda (x) (not (list? x))) (get-init-mods)))
 
 (: (optimize-equivalents tb)
   (docode-complete (table-ref tb main-sym)))
@@ -774,13 +782,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Generate phase - simply take the imperative instruction list and print as C.
-
-(: blank-program "
-#define EXIT_SUCCESS 0
-
-int main (void) { return EXIT_SUCCESS; }
-
-")
 
 (: (tocstr x)
   (cond
@@ -824,13 +825,15 @@ int main (void) { return EXIT_SUCCESS; }
 #define PRIMCALL_2(fn) smooth_sp -= 1; SMOOTH_TOS() = fn(SMOOTH_SPOFF(0), SMOOTH_TOS())
 #define PRIMCALL_3(fn) smooth_sp -= 2; SMOOTH_TOS() = fn(SMOOTH_SPOFF(1), SMOOTH_SPOFF(0), SMOOTH_TOS())
 
-int main (" (if (null? (get-init-mods)) "void" "const int argc, const char** const argv") ");
-
 "
 (apply string-append
-  (map (lambda (p) (string-append "void " p " (const int argc, const char** const argv);"))
+  (map
+    (lambda (x) (string-append "void " (if (list? x) (car x) x)
+                  " (" (if (list? x) "void" "const int argc, const char** const argv")
+                  ");\n"))
     (get-init-mods)))
-
+"
+"
 (apply string-append
   (map
     (lambda (p)
@@ -901,7 +904,7 @@ static void smooth_call_closure (smooth_t x) {
     smooth_execute();
   } else {
     local = SMOOTH_POP();
-    SMOOTH_PUSH(((smooth_t (*)(smooth_closure_t*, smooth_t)) fn)((smooth_closure_t*) x, local));
+    SMOOTH_PUSH(((smooth_t (*)(smooth_closure_t*, smooth_t)) code)((smooth_closure_t*) x, local));
   }
 }
 
@@ -941,18 +944,30 @@ static void smooth_execute (void) {
 "
 }
 
-int main (" (if (null? (get-init-mods)) "void" "const int argc, const char** const argv") ") {
+int main (" (if (init-mods-values) "const int argc, const char** const argv" "void") ") {
+
 #ifndef SMOOTH_FIXED_STACK
   smooth_stack = linked_array_allocate(SMOOTH_STACK_SIZE);
 #endif
+
+"
+(apply string-append
+  (map
+    (lambda (x) (string-append "  " (if (list? x) (car x) x)
+                  "(" (if (list? x) "" "argc, argv")
+                  ");\n"))
+    (get-init-mods)))
+"
 "
 (instructions-string (append tv (cddr (car tc))) false)
 
+(if (null? (get-close-mods)) ""
 "
 
-  while (0 /* Use this space to ask modules if they are still working */) { }
+  while (/* Use this space to ask modules if they are still working */) { }
   /* Use this space to call module finisher functions */
-
+")
+"
   return EXIT_SUCCESS;
 }
 

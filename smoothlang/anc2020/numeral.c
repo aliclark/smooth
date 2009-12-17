@@ -25,7 +25,7 @@ static smooth_t numeral_addone (smooth_t x) {
 
 static smooth_t numeral_numeral_x (smooth_closure_t* self, smooth_t local) {
   smooth_t depth;
-  SMOTH_PUSH(local);
+  SMOOTH_PUSH(local);
   for (depth = self->parent->local; depth > 0; --depth) {
     SMOOTH_CALL(self->local);
   }

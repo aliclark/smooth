@@ -1,4 +1,4 @@
-/*SMOOTH (depends smoothlang/anc2020/iocons smoothlang/anc2020/numeral ) */
+/*SMOOTH (init-module) */
 
 /*
  * Copyright (c) 2009, Ali Clark <emailaliclark@gmail.com>
@@ -23,18 +23,18 @@ smooth_t iocons (smooth_t, smooth_t);
 
 #include <stdio.h> /* Needed for definition of typedef FILE or stdin,stdout */
 
-smooth_t smoothlang_anc2020_iochar_stdin;
-smooth_t smoothlang_anc2020_iochar_stdout;
+smooth_t smoothlang_anc2020_iochar__stdin;
+smooth_t smoothlang_anc2020_iochar__stdout;
 
 void smoothlang_anc2020_iochar (void) {
-  smoothlang_anc2020_iochar_stdin  = (smooth_t) stdin;
-  smoothlang_anc2020_iochar_stdout = (smooth_t) stdout;
+  smoothlang_anc2020_iochar__stdin  = (smooth_t) stdin;
+  smoothlang_anc2020_iochar__stdout = (smooth_t) stdout;
 }
 
 smooth_t smoothlang_anc2020_iochar__cputc (smooth_t s, smooth_t c, smooth_t i) {
-  return iocons(putc(c, s), i);
+  return iocons(putc(c, (FILE*) s), i);
 }
 
 smooth_t smoothlang_anc2020_iochar__cgetc (smooth_t s, smooth_t i) {
-  return iocons(getc(s), i);
+  return iocons(getc((FILE*) s), i);
 }
