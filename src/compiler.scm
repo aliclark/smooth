@@ -264,6 +264,10 @@
 
 (: (n-of x n) (if (= n 0) nil (cons x (n-of x (- n 1)))))
 
+(: (every pred v) (if (null? v) #t (and (pred (car v)) (every pred (cdr v)))))
+
+(: (listndeep cpy it n) (if (= n 0) it (list cpy (listndeep cpy it (- n 1)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; DOMAIN SPECIFIC CODEZ
 
@@ -578,30 +582,6 @@
 ;;; Translate into imperative instruction form and slow sequences with faster ones.
 ;;; Takes a code hash as input and returns list of imperative code.
 
-;;; One thing I've noticed is that we would like to know the arity of functions being applied.
-;;; For eg. the arity of numeral_to_uint is 1,
-;;; whereas the arity for putChar is 1, plus 2 for the selectors.
-
-(: (app-depth l)
-  (if (list? l)
-    (+ (app-depth (cadr l)) 1)
-    0))
-
-(: (numeral_to_uint-opt l)
-  (let ((v (take-top (cdr l))))
-    (if (is-fn? v)
-      (cons (list 'PUSH (app-depth (caddr (caddr v)))) (cddr l))
-      l)))
-
-(: (hPutChar-opt l)
-  (cons (list 'hPutChar (cadr (cadr l)) (cadr (caddr l))) (cddr (cddr (cdr l)))))
-
-
-
-(: closure-gen-sym     (gensym 'closure))
-(: closure-ref-gen-sym (gensym 'closure-ref))
-(: cfn-gen-sym         (gensym 'cfn))
-
 (: todofns '())
 (: todons  1)
 
@@ -622,8 +602,6 @@
 (: (is-cquote? s) (and (pair? s) (eq? (car s) cquote-sym)))
 (: (cquote x)   (cons cquote-sym x))
 (: (cquote-value x) (cdr x))
-
-(: (every pred v) (if (null? v) #t (and (pred (car v)) (every pred (cdr v)))))
 
 ;; The only reason to not be eval ready is if we reference a local variable on stack.
 ;; if the leaf is a symbol and not a primop, then false.
@@ -704,8 +682,6 @@
 
 (: (exdepth x) (cond ((is-fn? x) 0) ((list? x) (+ (max (exdepth (cadr x)) (- (exdepth (car x)) 1)) 1)) (else 0)))
 
-(: (listndeep cpy it n) (if (= n 0) it (list cpy (listndeep cpy it (- n 1)))))
-
 (: (clos-lookup n)
   (cquote
     (if (= n 0)
@@ -756,70 +732,23 @@
      ,(tocstr (todo-evvs-code (prim-full-paths (re-aritise e))))))
 
 (: (docode-complete v)
-
-;(pretty-print v)
-
   (let ((dc (docode v false)))
     (let loop ((ac (list (cons 0 (cons (exdepth v) dc)))))
       (if (null? todofns)
         (cons (list todo-evns (map do-evv todo-evvs)) (reverse ac))
         (let ((nex (car todofns)))
           (set! todofns (cdr todofns))
-          (loop (cons (cons (todofns-id nex) (cons (exdepth (caddr (todofns-code nex))) (docode-lambda (depth-align-var (caddr (todofns-code nex)) (cadr (todofns-code nex))) (todofns-closdp nex)))) ac)))))))
-
+          (loop
+            (cons
+              (cons (todofns-id nex)
+                (cons (exdepth (caddr (todofns-code nex)))
+                  (docode-lambda
+                    (depth-align-var (caddr (todofns-code nex)) (cadr (todofns-code nex)))
+                    (todofns-closdp nex)))) ac)))))))
 
 (: (get-arity p) (if (eq? p 'hPutChar) 4 (if (eq? p 'numeral_to_uint) 1 0)))
 
 (: (get-init-mods) '())
-
-; PUSH( \2000( a20102399, \2000( b20112400, b20112400)));
-; PUSH( \2000( a20102395, \2000( b20112396, b20112396)));
-; PUSH( \2000( f21012150, \2000( x21022151, f21012150( x21022151))));
-; CALL( numeral_to_uint);
-; PUSH( stdout);
-; CALL( hPutChar);
-
-(: (take-stack l n)
-  (let ((nex (head l)))
-    (if (eq? (head nex) 'CALL)
-      (get-arity (cadr nex))
-      nil)))
-
-(: (take-top l) (cadr (car l)))
-
-(: (is-call? l) (eq? 'CALL (car l)))
-
-(: (peep-opt l)
-  (if (null? l) nil
-    (if (is-call? (head l))
-      (cond
-        ((eq? (cadr (head l)) 'numeral_to_uint) (numeral_to_uint-opt l))
-        ((eq? (cadr (head l)) 'hPutChar)        (hPutChar-opt (cons (car l) (peep-opt (cdr l)))))
-        (else (cons (car l) (peep-opt (cdr l)))))
-      (cons (car l) (peep-opt (cdr l))))))
-
-;; This part can do things like replace the code (numeral_to_uint seven) with just 7
-;; This function should probably output its code in imperative form, ie.
-;;
-;; (: main (putChar (numeral_to_uint ,(cube five)) false false))
-;;
-;; should result in:
-;;
-;; ((0
-;;   (putchar 125)))
-;;
-
-;(: (optimize-equivalents tb)
-(: (bla)
-  (let* ((dc (docode-complete (table-ref tb main-sym)))
-         (rdc (reverse (peep-opt (reverse dc)))))
-    (cons (length (table->list tb))
-      (cons
-        (cons
-          (cons 0
-            rdc)
-          nil)
-        nil))))
 
 (: (optimize-equivalents tb)
   (docode-complete (table-ref tb main-sym)))
@@ -1008,48 +937,6 @@ int main (" (if (null? (get-init-mods)) "void" "const int argc, const char** con
 
 ")))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Compiler - wrap up the component elements above into a single unit.
-
-(: (compile code)
-
-  ;; This step basically just takes us from our very lenient input
-  ;; code to a more rigid and verbose formatting of the code.
-  ;; Whereas before there were multiple ways of specifying some code,
-  ;; we have now converged onto one of those conventions.
-  ;; (def (f xs...) v) -> (def f (fn (xs...) v))
-  ;;  (fn (x xs...) v) ->  (fn x (fn (xs...) v))
-  ;;  (fn ()        v) -> v
-
-  (let ((p1 (expand-statements nil code)))
-
-    ;; Now we have a simplified version of source
-    ;; we start want to do lambda conversion
-    ;; and end up with a tail recursive representation.
-    ;; For now we are not concerned with optimization,
-    ;; and represent each lambda individually even where unnecessary.
-
-    ;; We do however still need to keep track of which global dependancies there
-    ;; are and compile those into the image too.
-
-    (let* ((p2t (main-reduce p1))
-	   (p2  (table-ref p2t main-sym)))
-
-(display p2)
-
-      (if (is-fn? p2)
-
-	;; This program doesn't do anything...
-	blank-program
-
-	(let ((p3t (optimize-equivalents p2t)))
-
-	  (generate-c p3t))))))
-
-(: (compile-files . files) (compile (read-all-files files)))
-
-(: (files-code-hash files)
-  (expand-statements nil (read-all-files files)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Module structure
