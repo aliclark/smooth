@@ -231,8 +231,14 @@ baz bar
       <div class="section" id="primitive-operations">
 	<h3>Primitive Operations</h3>
 	<p>
-	  The user may indicate to the compiler that a definition for a function is internal to the compiler and is not defined using Smooth. This is done may naming the function in a <code>.prims</code> file, and adding the file to the dependancies list.
+	  The user may indicate to the compiler that a definition for a function is internal to the compiler and is not defined using Smooth. This is done by naming the function in an <code>include</code> statement.
 	</p>
+        <p>eg.</p>
+        <pre>(include smoothlang/anc2020/iochar  stdin stdout (cputc 3) (cgetc 2))</pre>
+        <p>
+          Here, we specify that we want to import definitions for stdin, stdout, cputc and cgetc from iochar.c.
+          We also supply the arity for the definitions, here cputc is a C function of 3 variables
+          and stdin is a global C variable.
 	<p>
 	  Calls to such functions cannot be reduced during compilation, and are left until run-time, when the compiled program is executed, before they are run.
 	</p>
@@ -246,16 +252,10 @@ baz bar
 	  Firstly, the expression may already be a lambda in its simplest form. In this case simplification is complete.
 	</p>
 	<p>
-	  Alternatively we may have reached a function name that cannot be reduced further. This is possible when the function name is that of a primitive operation, or when the function being named is defined recursively.
+	  Alternatively we may have reached a function name that cannot be reduced further. This is possible when the function name is that of a primitive operation.
 	</p>
 	<p>
-	  Strict expansion of lambda expressions via Alpha conversion until reach recursion or primitive operations. The lazy evaluation after that.
-	</p>
-	<p>
-	  Expressions are evaluated at run-time using a call-by-need strategy in the presence of tail call optimization. Stack overflow exceptions must not happen whilst there is still memory available in the system. Instead, extra memory must be claimed for use in the stack. Only when memory is completely consumed may an exception be thrown. The program will be terminated immediately upon running out of memory.
-	</p>
-	<p>
-	  No other errors are permitted in Smooth. eg. 1/0 does not cause an exception, but instead a special value indicating that 1/0 was attempted.
+	  Expressions are evaluated at run-time using call-by-value. This means that there is no such thing as conditional evaluation in Smooth, only conditional values. Compilers are encouraged to provide stack implementations which can be customised to either grow as needed or have a fixed size at compile time, though it is up to the implementation what to do here.
 	</p>
       </div>
     </div>
@@ -275,36 +275,12 @@ baz bar
 	<p>Files are seen as libraries.</p>
 <pre>
 host/user/*
-  file_version.smo
-  file_version.slo   -- intermediate file format for Smooth code libraries
-  file_version.c
-  file_version.o
-  file_version.macs  -- file containing code for the compiler
-  file_version.prims -- list of lines naming the primitive operation functions
-  file_version.deps  -- list of lines in form of: host/user/file
+  file.smo   -- the Smooth code
+  file.slo   -- intermediate file format for Smooth code libraries
+  file.c
+  file.o
+  file.macs  -- file containing code for the compiler
 </pre>
-	<p>eg.</p>
-<pre>
-smooth-lang/anc2020/
-  lambda_1.smo
-  bool_1.smo
-  bool_1.deps  # smooth-lang/anc2020/lambda_1
-  pair_1.smo
-  pair_1.deps  # smooth-lang/anc2020/bool_1
-</pre>
-	<p>
-	  Now all we need is some kind of sync list for each host. This keeps all the deps files up to date.
-	</p>
-	<p>
-	eg.
-If <code>lambda_1</code> got updated so there is now a <code>lambda_2</code>,
-and <code>bool_1</code> stayed the same but wanted to use <code>lambda_2</code>, <code>bool_1.deps</code> would be updated.
-Now when the user syncs their <code>smooth-lang</code> libs, they will recompile <code>bool_1</code>
-and any of their libs that depended on <code>bool_1</code>, ie. <code>pair_1</code> etc.
-	</p>
-	<p>
-	  But there should also be a bug fix mode where version numbers do not change, so all libraries affected update automatically.
-	</p>
 	<p>
 	  Circular dependancies in libraries are not permitted. If file A depends on file B and file B depends on file A, then a 3rd file must be created which contains the part of A that depends on B and/or the part of B that depends on A, and with the new file depending on both A and B.
 	</p>
@@ -321,10 +297,5 @@ and any of their libs that depended on <code>bool_1</code>, ie. <code>pair_1</co
 	<p>Baz</p>
       </div>
     </div>
-
-smoothc -m main -c file-a.smo -d file-b.slo file-c.slo -p file-d.prims
-
-smcc file-a.smo
-
   </body>
 </html>
