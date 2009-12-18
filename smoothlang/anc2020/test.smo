@@ -8,7 +8,6 @@
 (: (false a b) b)
 (: (id x)      x)
 
-
 (: (++   n f x) f (n f x))
 (: (+  m n f x) n f (m f x))
 (: 0 false)

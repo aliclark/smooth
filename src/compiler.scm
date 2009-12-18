@@ -26,127 +26,39 @@
 ;;;;         These rules must be easily programmable.
 ;;;; step 4: straightforward printing of the imperative code format in C syntax.
 ;;;;
-;;;; Also todo:
-;;;; * Make it clear that symbols starting with #: are not allowed so they don't clash with gensym printing
-;;;;   if for some reason we ever need to save code representations by printing them out,
-;;;;   eg. incremental compiling may use this.
-;;;;   Bagsie the #: readmacro and don't allow it to be redefined.
-;;;; * (sqrt x) should _not_ use approximation methods to find a value!
-;;;;   whenever a number cannot be found, just return a symbolic expression, like (list sqrt-sym x)
-;;;;   When another function eg. + encounters sqrt-sym it should also return a symbolic expression.
-;;;;   (+ (* 3 4) (sqrt 4))  ->  (list +-sym 12 (list sqrt-sym 4))
-;;;;   Approximations in Smooth are extremely unwelcome, even if you have speed issues.
-;;;;   (sin 3) is (list sin-sym 3). pi is pi-sym. (/ 1 0) is +inf-sym.
-;;;;   The functions have rules for simplification, eg. for + :
-;;;;   (+-sym (*-sym (sin-sym x) (sin-sym x)) (*-sym (cos-sym x) (cos-sym x)))
-;;;;   Is replaced with 1 for any given "x".
-;;;;    Edit: I now realise this is called function totality. Function totality is good.
-;;;; * Find a way to allow incremental compilation.
-;;;;   This should allow independent files to use different dependancy functions of the same name.
-;;;;   This will probably require modifying the compiler somehow so that global variables are gensymed to become unique,
-;;;;   and some intermediate file format for library code.
-;;;; * Some kind of package format? anc2020-list (deps anc2020-pair anc2020-...)
-;;;; * Some kind of REPL interpreter.
-;;;; * Rewrite the Smooth compiler in the Smooth programming language (compiling to and distributing in C)
+;;;; TODO:
+;;;; * Multi file compilation.
+;;;; * REPL interpreter with good debugging ability
+;;;;   (probably make global definitions mutable and speed not important).
+;;;; * Rewrite the Smooth compiler in the Smooth programming language
+;;;; * Instead of making the user specify the arity of C functions, parse the C code and find out
+;;;; * Find out whether to run init by checking if the name is present in the C code.
+;;;; * Add read syntax
+;;;; * Add let binding compilation on function calls
+;;;;   (The compiler must only evaluate an argument to a function once, the code must not be simply copied)
+;;;; * Garbage collection, including iocons, finishers.
+;;;;   (I think I'll go with a conservative copying tricolor GC).
+;;;; * Shutdown functions.
+;;;; * Multi-threading support? Add some kind of refcounting to GC, stack and pc are thread local
+;;;; * TCO - use goto's and continuation k.
+;;;;
+;;;; NOTES:
 ;;;; * The module ID symbols must have a strict format of only [a-z][A-Z][0-9], starting with [a-z][A-Z]
 ;;;;   and hosts starting with "smooth" and "SMOOTH" are not allowed because they clash with our prefix.
 ;;;;
-;;;;
 ;;;; !!!!! Infinite recursion due to fnnames not being propogated after alpha-applications !!!!!
 ;;;;
-;;;; Should (include) 's be treated as though they are defined as part of the module,
-;;;; or as their own module entirely? Separate.
-;;;;
-;;;; With Smooth I would like to stay very very close to the C.
-;;;; By that I mean we should be more interested in just a few axiomatic functions
-;;;; like fputc and then numeral_to_int.
-;;;;
-;;;; Should we drop explicit support for recursion? yes, we use fixpoints and y combinator instead.
-;;;;
-
-
-; TODO: Instead of making the user specify the arity of C functions, parse the C code and find out
-; TODO: Find out whether to run init by checking if the name is present in the C code.
-; TODO: Add read syntax
-; TODO: Add multi file compilation
-; TODO: Add let binding compilation on function calls
-
-;So we have some basic code working. What next?
-;
-;* Finish closure generation.
-;    - May need a heap
-;    - May need to start using a type mask on stack pointers.
-;
-;* Add a heap and garbage collection and use it for iocons structures.
-
-
-;;; New idea...
-;
-; At the optimise phase, allow C module functions to give Smooth equivalents.
-; eg. numeral_to_uint - it doesn't reeeally need to run at run-time in some cases.
-;
-; So create a format for optimise functions eg.
-;
-; (: (numeral_to_uint x) (if (= x 0) (ret "0") (if (= x 1) (ret "1") (retnone))))
-;
-; This just gives an idea - the optimise function could return C code
-; or imperative pseudocode.
-;
-
-;
-; New rule, the compiler absolutely must evaluate code only once wherever it is obviously duplicated,
-; eg.
-;
-; (: (bar-baz y) (pair y y))
-; (: (myfunc  x) (bar-baz (compute x)))
-;
-; In this instance `y` must not be computed twice.
-; But equally, to remove performance whoring, we must also make sure that:
-;
-; (: (myfunc  x) (pair (compute x) (compute x)))
-;
-; does not evaluate `(compute x)` twice. How to do this in a fool-proof way, I don't know.
-;
-; (: (helper  y) (compute y))
-; (: (myfunc  x) (pair (helper x) (compute x)))  Can we simply allow this to evaluate twice?
-;
-
-
-;
-; What do I need in order to add threading support?
-; Needed in the case of handing callback procedures to GUI controls for example.
-;
-; Essentially, we need to create a new stack and pc, but apart from that it should be fine.
-;
-;
-
-;
-; Additionally, I'd like to spark threads wherever possible to evaluate code
-; wherever there are multiple arguments.
-;
-
-;
-; But first, we need to look at adding the GC and how this affects program code.
-; I think I'll go with a conservative copying tricolor GC.
-; This will need to be complemented by a reference counting or ignore of pointers passed into primops.
-; I'm not a big fan of pinning every single object that enters C code, so instead
-; for the case of the GUI control the code would increase the refcount of that object.
-; I'd also like to be able to add finalizers to run once a specific address seems to have fallen out of memory.
-;
-
-
-
-
-;;;;
 ;;;; Imports specific to Scheme:
-;
-; equal?        (assoc-ref-nfv, assoc-set, contains?, replace-all)
-; eq?           (remove-item, lookup, first-is?)
-; string-append (implode-)
-; list?         (replace-all, first-is?)
-; gensym        (lookup)
-; table-ref     (lookup)
-; error
+;;;;
+;;;; equal?        (assoc-ref-nfv, assoc-set, contains?, replace-all)
+;;;; eq?           (remove-item, lookup, first-is?)
+;;;; string-append (implode-)
+;;;; list?         (replace-all, first-is?)
+;;;; gensym        (lookup)
+;;;; table-ref     (lookup)
+;;;; error
+;;;;
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; MISC LIBRARY CODEZ

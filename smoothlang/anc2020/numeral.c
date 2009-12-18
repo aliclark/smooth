@@ -39,7 +39,7 @@ static smooth_t numeral_numeral_f (smooth_closure_t* self, smooth_t local) {
 /* This is our optimisation function (lambda -> C-code | null) */
 /*SMOOTH
 
-(: (smoothlang_anc2020_numeral__numeral_to_ulint x) (cquote "0"))
+(: (smoothlang_anc2020_numeral__numeral_to_ulint x) (cquote 0))
 
 */
 smooth_t smoothlang_anc2020_numeral__numeral_to_ulint (smooth_t x) {
