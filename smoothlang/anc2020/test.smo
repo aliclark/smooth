@@ -10,30 +10,31 @@
 
 (: (++   n f x) f (n f x))
 (: (+  m n f x) n f (m f x))
-(: 0 false)
-(: 1               ++ 0)
-(: 2               ++ 1)
-(: 3               ++ 2)
-(: 4               ++ 3)
-(: 5               ++ 4)
-(: 6               ++ 5)
-(: 7               ++ 6)
-(: 8               ++ 7)
-(: 9               ++ 8)
-(: 10              ++ 9)
+(: (* x y z)    x (y z))
 
-(: 42              + 10 (+ 10 (+ 10 (+ 10 2))))
-(: 43              ++ 42)
+(: 0   false)
+(: 1   ++ 0)
+(: 2   ++ 1)
+(: 3   ++ 2)
+(: 4   ++ 3)
+(: 5   ++ 4)
+(: 6   ++ 5)
+(: 7   ++ 6)
+(: 8   ++ 7)
+(: 9   ++ 8)
+(: 10  ++ 9)
 
-(: 100             (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 (+ 10 10))))))))))
+(: 100 (* 10 10))
 
-
-(: '*'  42)
-(: '+'  43)
-(: 'h'  (+ 100 4))
+(: 'H'  (+ (* 7 10) 2))
 (: 'e'  (+ 100 1))
 (: 'l'  (+ 100 8))
 (: 'o'  (+ 100 (+ 10 1)))
+(: '\s' (+ 10 (+ (* 2 10) 2)))
+(: 'W'  (+ (* 8 10) 7))
+(: 'r'  (+ 100 (+ 10 4)))
+(: 'd'  100)
+(: '!'  (+ (* 3 10) 3))
 (: '\n' 10)
 
 
@@ -68,7 +69,7 @@
 (: (>>  m1 m2)       >>= m1 (\ x m2))
 
 
-(: (putcc s c r)   cputc s c (++ r))
+(: (putcc s c r)   cputc c s (++ r))
 (: (putc  s c r)   putcc s (numeral_to_ulint c) r)
 (: putchar         putc stdout)
 
@@ -80,8 +81,16 @@
 (: (puts f s)      mapM_ (putc f) s)
 (: putstr          puts stdout)
 
-(: (putsln f s)    >> (puts f) (putc f '\n'))
+(: (putsln f s)    >> (puts f s) (putc f '\n'))
 (: putstrln        putsln stdout)
 
 
-(: main            run (putstrln (cons 'h' (cons 'e' (cons 'l' (cons 'l' (cons 'o' nil)))))))
+(: main1
+  run
+    (putstrln
+      (cons 'H' (cons 'e' (cons 'l' (cons 'l' (cons 'o' (cons '\s'
+      (cons 'W' (cons 'o' (cons 'r' (cons 'l' (cons 'd' (cons '!' nil))))))))))))))
+
+(: main2   run (>>= getchar putchar))
+
+(: main    run (>>= (getcc stdin) (putcc stdout)))

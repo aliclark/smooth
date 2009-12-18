@@ -1,4 +1,4 @@
-/*SMOOTH (init-module) */
+/*SMOOTH (init-module) (exposes putc getc puts) */
 
 /*
  * Copyright (c) 2009, Ali Clark <emailaliclark@gmail.com>
@@ -31,10 +31,26 @@ void smoothlang_anc2020_iochar (void) {
   smoothlang_anc2020_iochar__stdout = (smooth_t) stdout;
 }
 
-smooth_t smoothlang_anc2020_iochar__cputc (smooth_t s, smooth_t c, smooth_t i) {
+smooth_t smoothlang_anc2020_iochar__cputc (smooth_t c, smooth_t s, smooth_t i) {
   return iocons(putc(c, (FILE*) s), i);
 }
 
 smooth_t smoothlang_anc2020_iochar__cgetc (smooth_t s, smooth_t i) {
   return iocons(getc((FILE*) s), i);
+}
+
+
+/* These can be used instead of our optimiser recognises opportunities to use them. */
+
+smooth_t smoothlang_anc2020_iochar__putc (smooth_c c, smooth_t s) {
+  return putc(c, (FILE*) s);
+}
+
+smooth_t smoothlang_anc2020_iochar__getc (smooth_t s) {
+  return getc((FILE*) s);
+}
+
+/* If we get *really* good at optimisation, we might be able to replace consequetive putc calls with this. */
+smooth_t smoothlang_anc2020_iochar__fputs (smooth_t x, smooth_t s) {
+  return fputs((char*) x, (FILE*) s);
 }

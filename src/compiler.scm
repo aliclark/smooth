@@ -60,6 +60,41 @@
 ;;;;
 
 
+; We can either try to tag every argument that goes into a function,
+; then reduce the code and let-bind any remaining tags,
+; or
+; we can check through all the calls to our primitives
+; and see if the arguments of any two calls are the same.
+; This could be astronomically expensive.
+; It is O(n.m^2) where n is number of primitives used
+; and m is the max number of calls made to any one of them.
+; so for 10 different calls and 100 different calls made to one,
+; we could have a bound of 100,000.
+
+
+; For now I'll go with the latter option because it is cheaper for small programs
+; and quicker to implement.
+;
+; now we just need to work out how to save these values that are computed.
+;
+; We can store values through the cracks of function stack variables
+; for the lifetime of that function's call and then hopefully reference back n steps to that memory.
+
+; [a| c |b]
+;  ---- --
+; Here the function which takes a as it's variable is pushing the intermediate value c before
+; pushing the b function local variable. b can now know to reference past it's local variable to it.
+; b will also have to make sure to wipe them off the stack before pushing its rv however.
+; the value is not popped off immediately because if b makes function calls they
+; may want to reference back to it.
+
+;
+; First we'll only solve the simple case where the duplicated C calls are not dependant on the stack.
+; Then later when we start thinking about callbacks, such as GUI controls,
+; we'll need to make sure that dupliated C calls use the above methods
+;
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; MISC LIBRARY CODEZ
 
@@ -543,12 +578,6 @@
     (if (null? l) c
       (loop (replace-all c (car l) (list 'LOCAL y)) (cdr l) (+ y 1)))))
 
-;((cputchar
-;  (numeral_to_ulint '*'))
-;  (\ f
-;    (\ x
-;      (f (((iocons_cdr ((cputchar (numeral_to_ulint '+')) 1)) f) x)))))
-
 (: (send-out-fns v closdp)
   (if (is-fn? v)
     (begin
@@ -558,6 +587,23 @@
     (if (list? v)
       (map (lambda (x) (send-out-fns x closdp)) v)
       v)))
+
+
+; Some examples of using prevals within prevals.
+;
+; (: main (run (>>= (getcc stdin) (putcc stdout))))
+;
+; smooth_preval_3 = cgetc(stdin, ~4~);
+; smooth_preval_2 = iocons_cdr(smooth_preval_3);
+; smooth_preval_1 = cputc(stdout, iocons_car(smooth_preval_3), ~2~);
+;
+; (: main (run (>>= getchar putchar)))
+;
+; smooth_preval_4 = cgetc(stdin, ~5~);
+; smooth_preval_3 = iocons(ulint_to_numeral(iocons_car(smooth_preval_4)), iocons_cdr(smooth_preval_4));
+; smooth_preval_2 = iocons_cdr(smooth_preval_3);
+; smooth_preval_1 = cputc(stdout, numeral_to_ulint(iocons_car(smooth_preval_3)), ~3~);
+;
 
 (: (docode v closdp)
   (cond
@@ -682,8 +728,6 @@
                     (depth-align-var (caddr (todofns-code nex)) (cadr (todofns-code nex)))
                     (todofns-closdp nex)))) ac)))))))
 
-(: (get-arity p) (if (eq? p 'hPutChar) 4 (if (eq? p 'numeral_to_uint) 1 0)))
-
 (: (get-init-mods)  (list '("smoothlang_anc2020_iochar")))
 (: (get-close-mods) '())
 (: (init-mods-values) (any (lambda (x) (not (list? x))) (get-init-mods)))
@@ -736,6 +780,10 @@
 #define PRIMCALL_1(fn) SMOOTH_TOS() = fn(SMOOTH_TOS())
 #define PRIMCALL_2(fn) smooth_sp -= 1; SMOOTH_TOS() = fn(SMOOTH_SPOFF(0), SMOOTH_TOS())
 #define PRIMCALL_3(fn) smooth_sp -= 2; SMOOTH_TOS() = fn(SMOOTH_SPOFF(1), SMOOTH_SPOFF(0), SMOOTH_TOS())
+
+#ifdef TEACHER_MODE
+void perror (const char* s);
+#endif
 
 "
 (apply string-append
@@ -826,6 +874,9 @@ static void smooth_call_primitive (smooth_t fn) {
 }
 
 void smooth_call (smooth_t x) {
+#ifdef TEACHER_MODE
+  perror(\"Warning: made call\");
+#endif
   if (SMOOTH_CLOSURE_P(x)) {
     smooth_call_closure(x);
   } else if (SMOOTH_LAMBDA_P(x)) {
@@ -959,8 +1010,7 @@ int main (" (if (init-mods-values) "const int argc, const char** const argv" "vo
   ;;now include the libraries codes.
   (let ((c (foldr add-codez c (the-imports h))))
     (let* ((p2t (main-reduce (expand-statements nil c))))
-      (if (is-fn? (table-ref p2t main-sym)) blank-program
-        (generate-c (optimize-equivalents p2t))))))
+      (generate-c (optimize-equivalents p2t)))))
 
 (: (compile-library h c)
   (map compile-entry (the-imports h))
