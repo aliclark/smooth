@@ -85,12 +85,12 @@
 (: putstrln        putsln stdout)
 
 
-(: main1
+(: main
   run
     (putstrln
       (cons 'H' (cons 'e' (cons 'l' (cons 'l' (cons 'o' (cons '\s'
       (cons 'W' (cons 'o' (cons 'r' (cons 'l' (cons 'd' (cons '!' nil))))))))))))))
 
-(: main2   run (>>= getchar putchar))
+(: main1   run (>>= getchar putchar))
 
-(: main    run (>>= (getcc stdin) (putcc stdout)))
+(: main2    run (>>= (getcc stdin) (putcc stdout)))

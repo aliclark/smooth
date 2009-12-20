@@ -1016,9 +1016,9 @@ void smooth_push (smooth_t x) {
 
 smooth_t smooth_pop (void) {
 #ifdef SMOOTH_FIXED_STACK
-  return *linked_array_get(smooth_stack, --smooth_sp);
-#else
   return *--smooth_sp;
+#else
+  return *linked_array_get(smooth_stack, --smooth_sp);
 #endif
 }
 
