@@ -42,7 +42,7 @@ smooth_t smoothlang_anc2020_iochar__cgetc (smooth_t s, smooth_t i) {
 
 /* These can be used instead of our optimiser recognises opportunities to use them. */
 
-smooth_t smoothlang_anc2020_iochar__putc (smooth_c c, smooth_t s) {
+smooth_t smoothlang_anc2020_iochar__putc (smooth_t c, smooth_t s) {
   return putc(c, (FILE*) s);
 }
 

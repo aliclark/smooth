@@ -18,79 +18,35 @@
 #ifndef _SMOOTH_H
 #define _SMOOTH_H
 
-#ifndef SMOOTH_FIXED_STACK
-#include "smoothlang/anc2020/linkedarray/ali_linked_array.h"
-#endif
+/*
+ * The macros don't do much except add casts on the arguments,
+ * but they're use is recommended anyway for providing a slightly more abstract interface
+ * (or if you do use the declared names, it is favourable not to assume they are function pointers)
+ */
+
+#define SMOOTH_CLOSURE_CREATE(c, l, p) \
+                                 smooth_closure_create((smooth_t) c, (smooth_t) l, (smooth_closure_t*) p)
+#define SMOOTH_CLOSURE_LOCAL(x)  smooth_closure_local((smooth_closure_t*) x)
+#define SMOOTH_CLOSURE_PARENT(x) smooth_closure_parent((smooth_closure_t*) x)
+
+/* Smaller names because SMOOTH_CLOSURE_* is quite verbose for day-to-day coding */
+#define SMOOTH_C_CREATE(c, l, p) SMOOTH_CLOSURE_CREATE(c, l, p)
+#define SMOOTH_C_LOCAL(x)        SMOOTH_CLOSURE_LOCAL(x)
+#define SMOOTH_C_PARENT(x)       SMOOTH_CLOSURE_PARENT(x)
+
+
+#define SMOOTH_PUSH(x)  smooth_push((smooth_t) x)
+#define SMOOTH_POP()    smooth_pop()
+#define SMOOTH_CALL(x)  smooth_call((smooth_t) x)
+
 
 #ifndef _SMOOTH_T_TYPE
 #define _SMOOTH_T_TYPE
 typedef unsigned long int smooth_t;
 #endif
 
-#ifndef __attribute__
-#  define __attribute__(x) /*0*/
-#endif /* __attribute__ */
-
-
-/*
-When you use SMOOTH_*_P, exactly one of the predicates will be true, no matter what you pass.
-In other words, don't use SMOOTH_*_P unless you know you have some kind of function/procedure.
-*/
-
-
-#define SMOOTH_LAMBDA_P(x) (((smooth_t) (x)) < 128)
-
-
-#define SMOOTH_CLOSURE_MEM  128
-
-#define SMOOTH_CLOSURE_CREATE(c, l, p) smooth_closure_create((smooth_t) c, (smooth_t) l, (smooth_closure_t*) p)
-
-/*
- * Take an address and see if it is within our closure memory space.
- * This makes the assumption that the `smooth_closures` address is a much higher number
- * than any of the jump location numbers in execute.
- * For that reason, I would be much happier to just always assume that a pointer returned
- * is one of these, than to test with SMOOTH_CLOSP.
- */
-#define SMOOTH_CLOSURE_P(x)                                             \
-  ((((smooth_t) x) >= ((smooth_t) smooth_closures)) &&                  \
-   (((smooth_t) x) < ((smooth_t) (smooth_closures + SMOOTH_CLOSURE_MEM))))
-
-#define SMOOTH_CLOSURE_CODE(x)   ((smooth_closure_t*) x)->lambda
-#define SMOOTH_CLOSURE_LOCAL(x)  ((smooth_closure_t*) x)->local
-#define SMOOTH_CLOSURE_PARENT(x) ((smooth_closure_t*) x)->parent
-
-
-#define SMOOTH_PRIMITIVE_P(x) (!(SMOOTH_CLOSURE_P(x) || SMOOTH_LAMBDA_P(x)))
-
-
-/*
- * Stack operations
- * The default is correctness - we have a growable stack and check if growth is needed.
- * If the user knows what they are doing they can choose a fixed stack, with no limits checking.
- * The obvious advantage there is in speed, but the disadvantage is segfault on too much recursion.
- */
-#ifdef SMOOTH_FIXED_STACK
-
-#define SMOOTH_PUSH(x)  *smooth_sp++ = (smooth_t) x
-#define SMOOTH_POP()    *--smooth_sp
-#define SMOOTH_SPOFF(x) smooth_sp[x]
-#define SMOOTH_TOS()    SMOOTH_SPOFF(-1)
-
-#else
-
-#define SMOOTH_PUSH(x)  smooth_push((smooth_t) x)
-#define SMOOTH_POP()    *linked_array_get(smooth_stack, --smooth_sp)
-#define SMOOTH_SPOFF(x) *linked_array_get(smooth_stack, smooth_sp + (x))
-#define SMOOTH_TOS()    SMOOTH_SPOFF(-1)
-
-#endif /* SMOOTH_FIXED_STACK */
-
-#define SMOOTH_SPINC() ++smooth_sp
-#define SMOOTH_SPDEC() --smooth_sp
-
-
-#define SMOOTH_CALL(x) smooth_call(x)
+struct smooth_closure;
+typedef struct smooth_closure smooth_closure_t;
 
 
 #ifdef __cplusplus
@@ -98,31 +54,14 @@ extern "C" {
 #endif
 
 
-  typedef struct smooth_closure {
-    smooth_t lambda;              /* where to run code from. Could be native or on host. */
-    smooth_t local;               /* The local variable for this closure. */
-    struct smooth_closure* parent; /* Allows access to more closed variables. */
-
-  } smooth_closure_t;
-
-  /* The space for closures */
-  smooth_closure_t  smooth_closures[SMOOTH_CLOSURE_MEM];
-
-  smooth_t smooth_closure_create (smooth_t lambda, smooth_t local, smooth_closure_t* parent);
+  smooth_t          smooth_closure_create (smooth_t lambda, smooth_t local, smooth_closure_t* parent);
+  smooth_t          smooth_closure_local  (smooth_closure_t* c);
+  smooth_closure_t* smooth_closure_parent (smooth_closure_t* c);
 
 
-#ifdef SMOOTH_FIXED_STACK
-  smooth_t* smooth_sp;
-
-#else
-  struct linked_array* smooth_stack;
-  smooth_t smooth_sp;
-  void smooth_push (smooth_t x);
-
-#endif
-
-
-  void smooth_call (smooth_t x);
+  smooth_t smooth_pop  (void);
+  void     smooth_push (smooth_t x);
+  void     smooth_call (smooth_t x);
 
 
 #ifdef __cplusplus

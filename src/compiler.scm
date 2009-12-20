@@ -38,7 +38,6 @@
 ;;;;   (The compiler must only evaluate an argument to a function once, the code must not be simply copied)
 ;;;; * Garbage collection, including iocons, finishers.
 ;;;;   (I think I'll go with a conservative copying tricolor GC).
-;;;; * Shutdown functions.
 ;;;; * Multi-threading support? Add some kind of refcounting to GC, stack and pc are thread local
 ;;;; * TCO - use goto's and continuation k.
 ;;;;
@@ -601,9 +600,21 @@
 ;
 ; smooth_preval_4 = cgetc(stdin, ~5~);
 ; smooth_preval_3 = iocons(ulint_to_numeral(iocons_car(smooth_preval_4)), iocons_cdr(smooth_preval_4));
+;
 ; smooth_preval_2 = iocons_cdr(smooth_preval_3);
 ; smooth_preval_1 = cputc(stdout, numeral_to_ulint(iocons_car(smooth_preval_3)), ~3~);
 ;
+
+; Slightly less important, but we also want to quickly go through the fns to check if any are duplicates
+; of the same code.
+
+; Also we should re-order the printing of fns to get a better locality
+
+; We need to be able to go back over some code we have already seen and patch in a preval.
+; This means we need to be weary of creating more lambdas than we need.
+
+; We need to go through the fns sending them out.
+
 
 (: (docode v closdp)
   (cond
@@ -717,7 +728,13 @@
   (let ((dc (docode v false)))
     (let loop ((ac (list (cons 0 (cons (exdepth v) dc)))))
       (if (null? todofns)
+
+        ;; Now the fns are done we go through the preval code and add it to the front.
         (cons (list todo-evns (map do-evv todo-evvs)) (reverse ac))
+
+        ;; Go through the lambdas generating code.
+        ;; This may create even more lambdas to work through in the process
+        ;; and likewise will add code to the todo-evvs list
         (let ((nex (car todofns)))
           (set! todofns (cdr todofns))
           (loop
@@ -729,7 +746,6 @@
                     (todofns-closdp nex)))) ac)))))))
 
 (: (get-init-mods)  (list '("smoothlang_anc2020_iochar")))
-(: (get-close-mods) '())
 (: (init-mods-values) (any (lambda (x) (not (list? x))) (get-init-mods)))
 
 (: (optimize-equivalents tb)
@@ -757,12 +773,19 @@
     (string-append "
 #include \"smoothlang/anc2020/smooth.h\"
 
+#ifndef SMOOTH_FIXED_STACK
+#include \"smoothlang/anc2020/linkedarray/ali_linked_array.h\"
+#endif
+
+
 #ifndef __attribute__
 #  define __attribute__(x) /*0*/
 #endif /* __attribute__ */
 
+
 #define EXIT_SUCCESS 0
 #define NULL         0
+
 
 #ifndef SMOOTH_STACK_SIZE
 #  ifdef SMOOTH_FIXED_STACK
@@ -772,16 +795,66 @@
 #  endif
 #endif
 
-#define SMOOTH_SET(a, b) a = b
 
+#define SMOOTH_SET(a, b)       a = b
 #define SMOOTH_CLOSURE_CAST(a) ((smooth_closure_t*) a)
+
+
+#ifdef SMOOTH_FIXED_STACK
+
+#define SMOOTH_SPOFF(x) smooth_sp[x]
+#define SMOOTH_TOS()    SMOOTH_SPOFF(-1)
+
+#else
+
+#define SMOOTH_SPOFF(x) *linked_array_get(smooth_stack, smooth_sp + (x))
+#define SMOOTH_TOS()    SMOOTH_SPOFF(-1)
+
+#endif /* SMOOTH_FIXED_STACK */
+
+#define SMOOTH_SPINC() ++smooth_sp
+#define SMOOTH_SPDEC() --smooth_sp
+
+#define SMOOTH_CLOSURE_MEM  128
+
+/*
+When you use SMOOTH_*_P, exactly one of the predicates will be true, no matter what you pass.
+In other words, don't use SMOOTH_*_P unless you know you have some kind of function/procedure.
+*/
+
+#define SMOOTH_LAMBDA_P(x) (((smooth_t) (x)) < 128)
+
+/*
+ * Take an address and see if it is within our closure memory space.
+ * This makes the assumption that the `smooth_closures` address is a much higher number
+ * than any of the jump location numbers in execute.
+ * For that reason, I would be much happier to just always assume that a pointer returned
+ * is one of these, than to test with SMOOTH_CLOSP.
+ */
+#define SMOOTH_CLOSURE_P(x)                                             \
+  ((((smooth_t) x) >= ((smooth_t) smooth_closures)) &&                  \
+   (((smooth_t) x) < ((smooth_t) (smooth_closures + SMOOTH_CLOSURE_MEM))))
+
+#define SMOOTH_PRIMITIVE_P(x) (!(SMOOTH_CLOSURE_P(x) || SMOOTH_LAMBDA_P(x)))
+
+
+#define SMOOTH_CLOSURE_CODE(x)  ((smooth_closure_t*) x)->lambda
+
 
 /* Generate macros here to call primops of various aritys */
 #define PRIMCALL_1(fn) SMOOTH_TOS() = fn(SMOOTH_TOS())
 #define PRIMCALL_2(fn) smooth_sp -= 1; SMOOTH_TOS() = fn(SMOOTH_SPOFF(0), SMOOTH_TOS())
 #define PRIMCALL_3(fn) smooth_sp -= 2; SMOOTH_TOS() = fn(SMOOTH_SPOFF(1), SMOOTH_SPOFF(0), SMOOTH_TOS())
 
-#ifdef TEACHER_MODE
+
+struct smooth_closure {
+  smooth_t lambda;               /* where to run code from. Could be native or on host. */
+  smooth_t local;                /* The local variable for this closure. */
+  struct smooth_closure* parent; /* Allows access to more closed variables. */
+};
+
+
+#ifdef SMOOTH_TEACHER_MODE
 void perror (const char* s);
 #endif
 
@@ -803,11 +876,15 @@ void perror (const char* s);
 static smooth_t smooth_pc = 0;
 
 #ifdef SMOOTH_FIXED_STACK
-smooth_t  smooth_stack[SMOOTH_STACK_SIZE];
-smooth_t* smooth_sp = smooth_stack;
+static smooth_t smooth_stack[SMOOTH_STACK_SIZE];
+static smooth_t* smooth_sp = smooth_stack;
 #else
-smooth_t  smooth_sp = 0;
+static struct linked_array* smooth_stack;
+static smooth_t  smooth_sp = 0;
 #endif
+
+/* The space for closures */
+static smooth_closure_t smooth_closures[SMOOTH_CLOSURE_MEM];
 
 static smooth_closure_t* smooth_cp = smooth_closures + SMOOTH_CLOSURE_MEM;
 
@@ -823,27 +900,10 @@ static smooth_closure_t* smooth_cp = smooth_closures + SMOOTH_CLOSURE_MEM;
 "
 
 static void smooth_execute (void);
+static void smooth_call_lambda (smooth_t x);
+static void smooth_call_closure (smooth_t x);
+static void smooth_call_primitive (smooth_t fn);
 
-smooth_t smooth_closure_create (smooth_t lambda, smooth_t local, smooth_closure_t* parent) {
-  smooth_closure_t* rv;
-  if (smooth_cp == smooth_closures) {
-    // gc time!
-  }
-  rv = --smooth_cp;
-  rv->lambda = lambda;
-  rv->local  = local;
-  rv->parent = parent;
-  return (smooth_t) rv;
-}
-
-#ifndef SMOOTH_FIXED_STACK
-void smooth_push (smooth_t x) {
-  if (smooth_sp >= smooth_stack->length) {
-    smooth_stack = linked_array_grow(smooth_stack);
-  }
-  *linked_array_get(smooth_stack, smooth_sp++) = x;
-}
-#endif /* !SMOOTH_FIXED_STACK */
 
 static void smooth_call_lambda (smooth_t x) {
   SMOOTH_PUSH(NULL);
@@ -873,10 +933,15 @@ static void smooth_call_primitive (smooth_t fn) {
   SMOOTH_PUSH(((smooth_t (*)(smooth_t)) fn)(local));
 }
 
-void smooth_call (smooth_t x) {
-#ifdef TEACHER_MODE
+/*
+ * Since sparking only occurs by calls from modules,
+ * we can use this non-sparking version internally.
+ */
+static void smooth_internal_call (smooth_t x) {
+#ifdef SMOOTH_TEACHER_MODE
   perror(\"Warning: made call\");
 #endif
+
   if (SMOOTH_CLOSURE_P(x)) {
     smooth_call_closure(x);
   } else if (SMOOTH_LAMBDA_P(x)) {
@@ -886,13 +951,86 @@ void smooth_call (smooth_t x) {
   }
 }
 
+/*
+ * This runs when there are no more calls to make on a thread.
+ * Actually freeing the data requires locking because the same thread could initiate a new call
+ * while we are doing it, and we wouldn't want to risk allocing and freeing a lot if it does,
+ * so instead we should just leave a flag to let GC know it can be cleared.
+ * Since the GC will stop the world, it will deal with the locking problem then.
+ */
+static void smooth_thread_free (void) {
+
+}
+
+/*
+ * We need a fool-proof way to detect whether this call is being made from a new thread,
+ * or else provide a manual way of creating new thread specific memory,
+ * so multithreaded modules can ensure they don't clobber someone else's stack.
+ * There is also the problem of trying to retain a system that works on the metal,
+ * and therefore doesn't depend on eg. pthreads but maybe on something more general.
+ */
+void smooth_call (smooth_t x) {
+#if 0
+  // using linked_arrays to hold the variable pointers.
+  // get(smooth_pc, threadid), get(smooth_sp, threadid) and get(smooth_stack, threadid)
+
+  if (thisthreaid > smooth_threads_num) {
+    // we have sparked but more memory was needed.
+    // allocate lots and lots of new thread stack memory for this and future threads.
+  }
+#endif
+
+  smooth_internal_call(x);
+}
+
+smooth_t smooth_closure_create (smooth_t lambda, smooth_t local, smooth_closure_t* parent) {
+  smooth_closure_t* rv;
+  if (smooth_cp == smooth_closures) {
+    // gc time!
+  }
+  rv = --smooth_cp;
+  rv->lambda = lambda;
+  rv->local  = local;
+  rv->parent = parent;
+  return (smooth_t) rv;
+}
+
+smooth_t smooth_closure_local (smooth_closure_t* x) {
+  return x->local;
+}
+
+smooth_closure_t* smooth_closure_parent (smooth_closure_t* x) {
+  return x->parent;
+}
+
+void smooth_push (smooth_t x) {
+#ifdef SMOOTH_FIXED_STACK
+  *smooth_sp++ = (smooth_t) x;
+#else
+  if (smooth_sp >= smooth_stack->length) {
+    smooth_stack = linked_array_grow(smooth_stack);
+  }
+  *linked_array_get(smooth_stack, smooth_sp++) = x;
+#endif
+}
+
+smooth_t smooth_pop (void) {
+#ifdef SMOOTH_FIXED_STACK
+  return *linked_array_get(smooth_stack, --smooth_sp);
+#else
+  return *--smooth_sp;
+#endif
+}
+
 static void smooth_execute (void) {
   smooth_closure_t* self;
   smooth_t local;
 "
 (if (> (length (cdr tc)) 1)
 (string-append "
-/*jump:*/
+#if 0
+jump:
+#endif
   switch (smooth_pc) {
 "
 (implode ""
@@ -900,11 +1038,14 @@ static void smooth_execute (void) {
     (lambda (c)
       (string-append "    case " (number->string (head c)) ":\n"
         (instructions-string (cddr c) true)
-        "      return;\n"))
+        "      break;\n"))
     (cdr tc)))
 "  }")
 (instructions-string (cdaadr tc) false))
 "
+#if 0
+  smooth_thread_free();
+#endif
 }
 
 int main (" (if (init-mods-values) "const int argc, const char** const argv" "void") ") {
@@ -923,13 +1064,6 @@ int main (" (if (init-mods-values) "const int argc, const char** const argv" "vo
 "
 "
 (instructions-string (append tv (cddr (car tc))) false)
-
-(if (null? (get-close-mods)) ""
-"
-
-  while (/* Use this space to ask modules if they are still working */) { }
-  /* Use this space to call module finisher functions */
-")
 "
   return EXIT_SUCCESS;
 }

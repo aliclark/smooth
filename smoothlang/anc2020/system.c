@@ -38,3 +38,7 @@ smooth_t smoothlang_anc2020_system__system (smooth_t command, smooth_t z) {
 smooth_t smoothlang_anc2020_system__getenv (smooth_t name, smooth_t z) {
   return iocons(getenv(name), z);
 }
+
+smooth_t smoothlang_anc2020_system__exit (smooth_t status, smooth_t z) {
+  return iocons(exit(status), z);
+}
