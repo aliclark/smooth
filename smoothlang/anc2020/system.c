@@ -23,12 +23,12 @@ smooth_t iocons (smooth_t, smooth_t);
 int   system (const char* s);
 char* getenv (const char* s);
 
-smooth_t smoothlang_anc2020_system_argc;
-smooth_t smoothlang_anc2020_system_argv;
+smooth_t smoothlang_anc2020_system__argc;
+smooth_t smoothlang_anc2020_system__argv;
 
 void smoothlang_anc2020_system (int argc, char** argv) {
-  smoothlang_anc2020_system_argc = (smooth_t) argc;
-  smoothlang_anc2020_system_argv = (smooth_t) argv;
+  smoothlang_anc2020_system__argc = (smooth_t) argc;
+  smoothlang_anc2020_system__argv = (smooth_t) argv;
 }
 
 smooth_t smoothlang_anc2020_system__system (smooth_t command, smooth_t z) {
