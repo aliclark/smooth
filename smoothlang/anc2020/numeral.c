@@ -24,11 +24,19 @@ static smooth_t numeral_addone (smooth_t x) {
 }
 
 static smooth_t numeral_numeral_x (smooth_closure_t* self, smooth_t local) {
-  smooth_t depth;
-  SMOOTH_PUSH(local);
-  for (depth = SMOOTH_C_LOCAL(SMOOTH_C_PARENT(self)); depth > 0; --depth) {
-    SMOOTH_CALL(SMOOTH_C_LOCAL(self));
+  smooth_t depth = SMOOTH_C_LOCAL(SMOOTH_C_PARENT(self));
+  smooth_t f     = SMOOTH_C_LOCAL(self);
+
+  /* Since we defined `addone` ourselves, we know it just adds 1, `depth` times */
+  if ((local == 0) && (f == ((smooth_t) numeral_addone))) {
+    return depth;
   }
+
+  SMOOTH_PUSH(local);
+  for (; depth > 0; --depth) {
+    SMOOTH_CALL(f);
+  }
+
   return SMOOTH_POP();
 }
 
