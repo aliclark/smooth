@@ -28,8 +28,8 @@ static smooth_t numeral_numeral_x (smooth_closure_t* self, smooth_t local) {
   smooth_t f     = SMOOTH_C_LOCAL(self);
 
   /* Since we defined `addone` ourselves, we know it just adds 1, `depth` times */
-  if ((local == 0) && (f == ((smooth_t) numeral_addone))) {
-    return depth;
+  if (f == ((smooth_t) numeral_addone)) {
+    return depth + local;
   }
 
   SMOOTH_PUSH(local);
