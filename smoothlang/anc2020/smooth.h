@@ -38,8 +38,8 @@
 #define SMOOTH_PUSH(x)  smooth_push((smooth_t) x)
 #define SMOOTH_POP()    smooth_pop()
 
-#define SMOOTH_APPLY(x, y)    smooth_apply((smooth_t) x, (smooth_t) y)
-#define SMOOTH_SPARK_APPLY(x) smooth_spark_apply((smooth_t) x, (smooth_t) y)
+#define SMOOTH_APPLY(x, y)       smooth_apply((smooth_t) x, (smooth_t) y)
+#define SMOOTH_SPARK_APPLY(x, y) smooth_spark_apply((smooth_t) x, (smooth_t) y)
 
 
 #ifndef SMOOTH__T_TYPE
