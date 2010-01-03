@@ -28,13 +28,10 @@
  * To get around this, you may want to use struct linked_array** instead.
  */
 
-#ifndef _ALI_LINKED_ARRAY_H
-#define _ALI_LINKED_ARRAY_H
+#ifndef SMOOTH__LINKED_ARRAY_H
+#define SMOOTH__LINKED_ARRAY_H
 
-#ifndef _SMOOTH_T_TYPE
-#define _SMOOTH_T_TYPE
-typedef unsigned long int smooth_t;
-#endif
+#include "smoothlang/anc2020/smooth.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,25 +41,25 @@ extern "C" {
  * Please do not allocate one of these yourself;
  * use linked_array_allocate if you want one.
  */
-struct linked_array {
+typedef struct smooth_linked_array {
 	smooth_t* array; /* The block of allocated memory for array contents. */
 	smooth_t max;      /* The max capacity of the array memory for this head. */
 	smooth_t length;   /* Holds the value (max*2), saving on calculation time. */
-	struct linked_array* rest; /* The other half of the linked_array. */
-};
+	struct smooth_linked_array* rest; /* The other half of the linked_array. */
+} smooth_linked_array_t;
 
 /*
  * Will return a pointer to the index of the linked_list in O(log n) time.
  * This pointer can then be used with a cast to read or write its contents.
  */
-smooth_t* linked_array_get (struct linked_array* list, smooth_t index);
+smooth_t* smooth__linked_array_get (smooth_linked_array_t* list, smooth_t index);
 
 /*
  * Allocates another head for the linked_array with twice the capacity of
  * the head of the supplied linked_array. The new head has elements
  * each of size "size". Returns the newly allocated linked_array.
  */
-struct linked_array* linked_array_grow (struct linked_array* list);
+smooth_linked_array_t* smooth__linked_array_grow (smooth_linked_array_t* list);
 
 /*
  * If you have dynamically grown the linked_array using linked_array_grow,
@@ -71,7 +68,7 @@ struct linked_array* linked_array_grow (struct linked_array* list);
  * This will halve the size of your linked_array.
  * The return value is the rest of the linked_array.
  */
-struct linked_array* linked_array_shrink (struct linked_array* list);
+smooth_linked_array_t* smooth__linked_array_shrink (smooth_linked_array_t* list);
 
 /*
  * Create a new linked_array with "start" being the
@@ -80,18 +77,18 @@ struct linked_array* linked_array_shrink (struct linked_array* list);
  * You must use this procedure if you want a new linked_array, you cannot
  * simply allocate one from the struct.
  */
-struct linked_array* linked_array_allocate (smooth_t start);
+smooth_linked_array_t* smooth__linked_array_allocate (smooth_t start);
 
 /*
  * If you were using the linked_array to hold pointers to objects
  * you allocated yourself, you must free them yourself;
  * linked_array_free will only free the memory it has allocated itself.
  */
-void linked_array_free (struct linked_array* list);
+void smooth__linked_array_free (smooth_linked_array_t* list);
 
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
-#endif /* _ALI_LINKED_ARRAY_H */
+#endif /* SMOOTH__LINKED_ARRAY_H */
 

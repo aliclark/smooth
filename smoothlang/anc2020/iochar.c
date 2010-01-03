@@ -25,32 +25,35 @@ smooth_t iocons (smooth_t, smooth_t);
 
 smooth_t smoothlang_anc2020_iochar__stdin;
 smooth_t smoothlang_anc2020_iochar__stdout;
+smooth_t smoothlang_anc2020_iochar__stderr;
 
 void smoothlang_anc2020_iochar (void) {
   smoothlang_anc2020_iochar__stdin  = (smooth_t) stdin;
   smoothlang_anc2020_iochar__stdout = (smooth_t) stdout;
+  smoothlang_anc2020_iochar__stderr = (smooth_t) stderr;
 }
 
-smooth_t smoothlang_anc2020_iochar__cputc (smooth_t c, smooth_t s, smooth_t i) {
+smooth_t smoothlang_anc2020_iochar__cfputc (smooth_t c, smooth_t s, smooth_t i) {
   return iocons(putc(c, (FILE*) s), i);
 }
 
-smooth_t smoothlang_anc2020_iochar__cgetc (smooth_t s, smooth_t i) {
+smooth_t smoothlang_anc2020_iochar__cfgetc (smooth_t s, smooth_t i) {
   return iocons(getc((FILE*) s), i);
 }
 
 
-/* These can be used instead of our optimiser recognises opportunities to use them. */
+/* These can be used instead if our optimiser recognises opportunities to use them. */
 
-smooth_t smoothlang_anc2020_iochar__putc (smooth_t c, smooth_t s) {
+smooth_t smoothlang_anc2020_iochar__fputc_opt (smooth_t c, smooth_t s) {
   return putc(c, (FILE*) s);
 }
 
-smooth_t smoothlang_anc2020_iochar__getc (smooth_t s) {
+smooth_t smoothlang_anc2020_iochar__fgetc_opt (smooth_t s) {
   return getc((FILE*) s);
 }
 
-/* If we get *really* good at optimisation, we might be able to replace consequetive putc calls with this. */
-smooth_t smoothlang_anc2020_iochar__fputs (smooth_t x, smooth_t s) {
+/* If we get *really* good at optimisation,
+ * we might be able to replace consequetive fputc calls with this. */
+smooth_t smoothlang_anc2020_iochar__fputs_opt (smooth_t x, smooth_t s) {
   return fputs((char*) x, (FILE*) s);
 }

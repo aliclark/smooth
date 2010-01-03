@@ -32,12 +32,11 @@ static smooth_t numeral_numeral_x (smooth_closure_t* self, smooth_t local) {
     return depth + local;
   }
 
-  SMOOTH_PUSH(local);
+  /* This is here as a formal requirement, but there is no need to ever reach this point. */
   for (; depth > 0; --depth) {
-    SMOOTH_CALL(f);
+    local = SMOOTH_APPLY(f, local);
   }
-
-  return SMOOTH_POP();
+  return local;
 }
 
 static smooth_t numeral_numeral_f (smooth_closure_t* self, smooth_t local) {
@@ -51,11 +50,7 @@ static smooth_t numeral_numeral_f (smooth_closure_t* self, smooth_t local) {
 
 */
 smooth_t smoothlang_anc2020_numeral__numeral_to_ulint (smooth_t x) {
-  SMOOTH_PUSH(0);
-  SMOOTH_PUSH(numeral_addone);
-  SMOOTH_CALL(x);
-  SMOOTH_CALL(SMOOTH_POP());
-  return SMOOTH_POP();
+  return SMOOTH_APPLY(SMOOTH_APPLY(x, numeral_addone), 0);
 }
 
 smooth_t smoothlang_anc2020_numeral__ulint_to_numeral (smooth_t a) {

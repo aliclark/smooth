@@ -21,8 +21,8 @@
  *  Copyright (C) 2009  Ali Clark
  */
 
-#ifndef _ALI_MEMORY_H
-#define _ALI_MEMORY_H
+#ifndef SMOOTH__MEMORY_H
+#define SMOOTH__MEMORY_H
 
 void  free (void* ptr);
 void* malloc (unsigned long int size);
@@ -34,9 +34,9 @@ void* malloc (unsigned long int size);
 
 #define NIL 0
 
-#define MALLOCATE(num)              check_not_null(malloc(ceil_base2(num)))
+#define MALLOCATE(num)               smooth__memory_check_not_null(malloc(smooth__memory_ceil_base2(num)))
 
-#define TALLOCATE( type, num)      ((type *) MALLOCATE( (num) * sizeof( type)))
+#define TALLOCATE( type, num)        ((type *) MALLOCATE( (num) * sizeof( type)))
 #define TALLOCATED( type, name, num) type *name = TALLOCATE( type, num)
 #define STALLOCATED( type, name)     TALLOCATED( type, name, 1)
 
@@ -46,14 +46,14 @@ void* malloc (unsigned long int size);
 extern "C" {
 #endif
 
-         void* check_not_null (void* pointer);
+         void* smooth__memory_check_not_null (void* pointer);
 
 	/* Round up to nearest base2 number. */
-	unsigned long int ceil_base2 (const unsigned long int number) __attribute__((const));
+	unsigned long int smooth__memory_ceil_base2 (const unsigned long int number) __attribute__((const));
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _ALI_MEMORY_H */
+#endif /* SMOOTH__MEMORY_H */
 

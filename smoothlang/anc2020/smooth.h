@@ -15,8 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _SMOOTH_H
-#define _SMOOTH_H
+#ifndef SMOOTH__H
+#define SMOOTH__H
 
 /*
  * The macros don't do much except add casts on the arguments,
@@ -37,11 +37,13 @@
 
 #define SMOOTH_PUSH(x)  smooth_push((smooth_t) x)
 #define SMOOTH_POP()    smooth_pop()
-#define SMOOTH_CALL(x)  smooth_call((smooth_t) x)
+
+#define SMOOTH_APPLY(x, y)    smooth_apply((smooth_t) x, (smooth_t) y)
+#define SMOOTH_SPARK_APPLY(x) smooth_spark_apply((smooth_t) x, (smooth_t) y)
 
 
-#ifndef _SMOOTH_T_TYPE
-#define _SMOOTH_T_TYPE
+#ifndef SMOOTH__T_TYPE
+#define SMOOTH__T_TYPE
 typedef unsigned long int smooth_t;
 #endif
 
@@ -61,12 +63,20 @@ extern "C" {
 
   smooth_t smooth_pop  (void);
   void     smooth_push (smooth_t x);
-  void     smooth_call (smooth_t x);
+
+
+  smooth_t smooth_apply       (smooth_t x, smooth_t y);
+  smooth_t smooth_spark_apply (smooth_t x, smooth_t y);
+
+
+  void  smooth_gc_register (smooth_t ptr,  void (*freeptr)(smooth_t));
+  void* smooth_gc_allocate (smooth_t size, void (*freeptr)(smooth_t));
+  void  smooth_gc_incref   (smooth_t ptr);
+  void  smooth_gc_decref   (smooth_t ptr);
 
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _SMOOTH_H */
-
+#endif /* SMOOTH__H */

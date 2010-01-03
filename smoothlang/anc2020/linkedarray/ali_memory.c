@@ -32,11 +32,11 @@ void perror (const char* s);
  * Returns the most significant bit position of n from 0 to 31.
  * -1 returned if no bit is set.
  */
-static long int msb (unsigned long int number) __attribute__((const));
+static long int smooth__memory_msb (unsigned long int number) __attribute__((const));
 
 /*---------------------------------------------------------------------------*/
 
-static long int msb (unsigned long int n)
+static long int smooth__memory_msb (unsigned long int n)
 {
 	long int pos = 0;
 	long int tmp = 0;
@@ -75,14 +75,14 @@ static long int msb (unsigned long int n)
 
 /*---------------------------------------------------------------------------*/
 
-unsigned long int ceil_base2 (const unsigned long int x)
+unsigned long int smooth__memory_ceil_base2 (const unsigned long int x)
 {
-	return (x & (x - 1)) ? ((unsigned long int) 1) << (msb( x) + 1) : x;
+	return (x & (x - 1)) ? ((unsigned long int) 1) << (smooth__memory_msb( x) + 1) : x;
 }
 
 /*---------------------------------------------------------------------------*/
 
-void *check_not_null (void *ptr)
+void *smooth__memory_check_not_null (void *ptr)
 {
 	if (!ptr) {
 		perror( "Could not allocate memory.");

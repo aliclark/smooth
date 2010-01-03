@@ -24,6 +24,10 @@
 #include "smoothlang/anc2020/linkedarray/ali_linked_array.h"
 #include "smoothlang/anc2020/linkedarray/ali_memory.h"
 
+#ifndef __inline__
+#  define __inline__ inline
+#endif
+
 #define EXIT_FAILURE 1
 
 void exit (int s);
@@ -34,19 +38,19 @@ void perror (const char* s);
  * size is the size of each element, and max is the number
  * of items we want to allocate for this head.
  */
-static __inline__ void linked_array_initialise (struct linked_array *list,
-						smooth_t max);
+static __inline__ void smooth__linked_array_initialise (smooth_linked_array_t *list,
+							smooth_t max);
 
 /*
  * Frees the top half of the link_array array memory
  * and the structure of the linked_array head.
  */
-static __inline__ void linked_array_free_head (struct linked_array *list);
+static __inline__ void smooth__linked_array_free_head (smooth_linked_array_t *list);
 
 /*---------------------------------------------------------------------------*/
 
-static __inline__ void linked_array_initialise (struct linked_array *list,
-						smooth_t max)
+static __inline__ void smooth__linked_array_initialise (smooth_linked_array_t *list,
+							smooth_t max)
 {
 	list->array  = MALLOCATE(sizeof(smooth_t) * max);
 	list->max    = max;
@@ -56,7 +60,7 @@ static __inline__ void linked_array_initialise (struct linked_array *list,
 
 /*---------------------------------------------------------------------------*/
 
-static __inline__ void linked_array_free_head (struct linked_array *list)
+static __inline__ void smooth__linked_array_free_head (smooth_linked_array_t *list)
 {
 	FREE(list->array);
 	FREE(list);
@@ -64,17 +68,17 @@ static __inline__ void linked_array_free_head (struct linked_array *list)
 
 /*---------------------------------------------------------------------------*/
 
-struct linked_array *linked_array_allocate (smooth_t length)
+smooth_linked_array_t *smooth__linked_array_allocate (smooth_t length)
 {
 	smooth_t max;
-	STALLOCATED( struct linked_array, a);
-	STALLOCATED( struct linked_array, b);
+	STALLOCATED( smooth_linked_array_t, a);
+	STALLOCATED( smooth_linked_array_t, b);
 
-	length = (smooth_t) ceil_base2( length);
+	length = (smooth_t) smooth__memory_ceil_base2( length);
 	max    = (smooth_t) ((length == 1) ? 1 : (length / 2));
 
-	linked_array_initialise( a, max);
-	linked_array_initialise( b, max);
+	smooth__linked_array_initialise( a, max);
+	smooth__linked_array_initialise( b, max);
 
 	b->rest = a;
 	return b;
@@ -82,18 +86,18 @@ struct linked_array *linked_array_allocate (smooth_t length)
 
 /*---------------------------------------------------------------------------*/
 
-void linked_array_free (struct linked_array *list)
+void smooth__linked_array_free (smooth_linked_array_t *list)
 {
 	if (list->rest) {
-		linked_array_free(list->rest);
+		smooth__linked_array_free(list->rest);
 	}
-	linked_array_free_head(list);
+	smooth__linked_array_free_head(list);
 }
 
 /*---------------------------------------------------------------------------*/
 
 /* This is the "1" in our O(1). It must be zippidy zip! */
-smooth_t* linked_array_get (struct linked_array *list, smooth_t index)
+smooth_t* smooth__linked_array_get (smooth_linked_array_t *list, smooth_t index)
 {
 	while (index < list->max) {
 		if (list->rest) {
@@ -107,26 +111,26 @@ smooth_t* linked_array_get (struct linked_array *list, smooth_t index)
 
 /*---------------------------------------------------------------------------*/
 
-struct linked_array *linked_array_grow (struct linked_array *list)
+smooth_linked_array_t *smooth__linked_array_grow (smooth_linked_array_t *list)
 {
-	STALLOCATED(struct linked_array, a);
-	linked_array_initialise(a, list->length);
+	STALLOCATED(smooth_linked_array_t, a);
+	smooth__linked_array_initialise(a, list->length);
 	a->rest = list;
 	return a;
 }
 
 /*---------------------------------------------------------------------------*/
 
-struct linked_array *linked_array_shrink (struct linked_array *list)
+smooth_linked_array_t *smooth__linked_array_shrink (smooth_linked_array_t *list)
 {
-	struct linked_array *rest = list->rest;
+	smooth_linked_array_t *rest = list->rest;
 
 	if (!rest || !rest->rest) {
 		perror( "Error: Tried to shrink linked_array "
 			"beyond initial size.");
 		exit( EXIT_FAILURE);
 	}
-	linked_array_free_head( list);
+	smooth__linked_array_free_head( list);
 	return rest;
 }
 
