@@ -20,7 +20,7 @@
 
 /*
  * The macros don't do much except add casts on the arguments,
- * but they're use is recommended anyway for providing a slightly more abstract interface
+ * but their use is recommended anyway for providing a slightly more abstract interface
  * (or if you do use the declared names, it is favourable not to assume they are function pointers)
  */
 
