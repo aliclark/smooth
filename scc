@@ -6,7 +6,14 @@
 
 DEPS=(smoothlang/anc2020/numeral.c smoothlang/anc2020/iochar.c smoothlang/anc2020/iocons.c)
 
-# Shouldn't be too hard to get this one though
-OUTNAME=test
+# Shouldn't be too to generate this one though
+OUTNAME=smoothlang_anc2020_test
 
-./src/compiler.scm $1 | gcc -o $OUTNAME -I. -xc ${@:2} ${DEPS[@]} smoothlang/anc2020/linkedarray/ali_memory.c smoothlang/anc2020/linkedarray/ali_linked_array.c -
+# These are deps for the runtime growable stack unfortunately we can't know whether if it is needed beforehand.
+# OTOH you only save about 1k by not including these!
+SDEPS=(smoothlang/anc2020/linkedarray/ali_memory.c smoothlang/anc2020/linkedarray/ali_linked_array.c)
+
+# Holds the bulk of the runtime
+CORE=(smoothlang/anc2020/_smooth.c)
+
+./src/compiler.scm $1 | gcc -o $OUTNAME -I. -xc ${@:2} ${SDEPS[@]} $CORE ${DEPS[@]} -
