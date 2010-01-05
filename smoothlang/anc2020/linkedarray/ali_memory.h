@@ -24,12 +24,13 @@
 #ifndef SMOOTH__MEMORY_H
 #define SMOOTH__MEMORY_H
 
-void  free (void* ptr);
-void* malloc (unsigned long int size);
+typedef unsigned long int size_t;
 
-/* _ attribute _ */
+void  free (void* ptr);
+void* malloc (size_t size);
+
 #ifndef __attribute__
-#  define __attribute__(x)  /*0*/
+#  define __attribute__(x)  /*__attribute(x)__*/
 #endif /* __attribute__ */
 
 #define NIL 0

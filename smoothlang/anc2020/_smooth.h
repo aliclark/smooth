@@ -14,7 +14,7 @@
 
 
 #ifndef __attribute__
-#  define __attribute__(x) /*0*/
+#  define __attribute__(x) /*__attribute(x)__*/
 #endif /* __attribute__ */
 
 
@@ -30,6 +30,7 @@
 
 #define SMOOTH_SET(a, b)       a = b
 #define SMOOTH_CLOSURE_CAST(a) ((smooth_closure_t*) a)
+#define SMOOTH_REPEAT(c, n)    for (i = n; i > 0; --i) { c; }
 
 #define SMOOTH_CALL(x) smooth_call((smooth_t) x)
 
@@ -49,15 +50,13 @@
     } \
   } while (0)
 
-#define SMOOTH_REPEAT(c, n)    for (i = n; i > 0; --i) { c; }
-
 
 #ifdef SMOOTH_FIXED_STACK
 #  define SMOOTH__PUSH(x) *smooth_sp++ = ((smooth_t) (x))
 #  define SMOOTH__POP()   (*--smooth_sp)
 #  define SMOOTH_SPOFF(x) smooth_sp[x]
 #else
-#  define SMOOTH__PUSH(x) smooth_push(x)
+#  define SMOOTH__PUSH(x) smooth_la_push(x)
 #  define SMOOTH__POP()   *smooth__linked_array_get(smooth_stack, --smooth_sp)
 #  define SMOOTH_SPOFF(x) *smooth__linked_array_get(smooth_stack, smooth_sp + (x))
 #endif /* SMOOTH_FIXED_STACK */
@@ -109,18 +108,30 @@ typedef smooth_t smooth_th_t;
 
 /**********************************/
 
-extern smooth_t smooth_pc;
-
-#ifdef SMOOTH_FIXED_STACK
-extern smooth_t* __restrict__ smooth_sp;
-#else
-extern smooth_linked_array_t* __restrict__ smooth_stack;
-extern smooth_t  smooth_sp;
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-extern smooth_closure_t smooth_closures[SMOOTH_CLOSURE_MEM];
+  extern smooth_t smooth_pc;
+  
+#ifdef SMOOTH_FIXED_STACK
+  extern smooth_t* __restrict__ smooth_sp;
+#else
+  extern smooth_linked_array_t* __restrict__ smooth_stack;
+  extern smooth_t smooth_sp;
+#endif
 
-void smooth_call  (smooth_t x);
-void smooth__call (smooth_t x);
+  extern smooth_closure_t smooth_closures[SMOOTH_CLOSURE_MEM];
+
+  void smooth_call  (smooth_t x);
+  void smooth__call (smooth_t x);
+
+#ifndef SMOOTH_FIXED_STACK
+  void smooth_la_push (smooth_t x);
+#endif
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _SMOOTH__H */

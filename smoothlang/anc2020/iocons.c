@@ -17,8 +17,10 @@
 
 #include "smoothlang/anc2020/smooth.h"
 
+typedef unsigned long int size_t;
+
 void  free   (void* p);
-void* malloc (unsigned long int s);
+void* malloc (size_t s);
 
 typedef struct iocons_s {
   smooth_t x;

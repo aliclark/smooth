@@ -25,7 +25,11 @@
 #include "smoothlang/anc2020/linkedarray/ali_memory.h"
 
 #ifndef __inline__
-#  define __inline__ inline
+#  if __STDC_VERSION__ >= 199901L
+#    define __inline__ inline
+#  else
+#    define __inline__ /*inline*/
+#  endif
 #endif
 
 #define EXIT_FAILURE 1

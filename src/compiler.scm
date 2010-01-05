@@ -604,6 +604,10 @@
 ;;; Translate into imperative instruction form and slow sequences with faster ones.
 ;;; Takes a code hash as input and returns list of imperative code.
 
+(: (find-first p xs)
+  (if (null? xs) #f (if (p (car xs)) (car xs) (find-first p (cdr xs)))))
+
+
 (: todofns '())
 (: todons  1)
 
@@ -611,6 +615,44 @@
 (: (todofns-id x)     (car x))
 (: (todofns-code x)   (cadr x))
 (: (todofns-closdp x) (caddr x))
+
+;; (\ x (\ y y))
+;; (\ a (\ b b))
+;; x = a
+;; y = b
+(: (todofns-same-code-? x y vars)
+  (cond
+    ((is-fn? x)
+      (if (is-fn? y)
+        (todofns-same-code-? (caddr x) (caddr y) (assoc-set vars (cadr x) (cadr y)))
+        #f))
+    ((and (list? x) (list? y))
+      (and
+        (todofns-same-code-? (car  x) (car  y) vars)
+        (todofns-same-code-? (cadr x) (cadr y) vars)))
+    ((and (symbol? x) (symbol? y)) (eq? (assoc-ref-nfv vars x '()) y))
+    (else #f)))
+
+(: (todofns-same-code? x y) (todofns-same-code-? x y '()))
+
+(: (todofns-same-closdp? x y) (or (and x y) (not (or x y))))
+
+(: (todofns-lookup code closdp)
+  (find-first
+    (lambda (f)
+      (and
+        (todofns-same-code? (todofns-code f) code)
+        (todofns-same-closdp? (todofns-closdp f) closdp)))
+    todofns))
+
+(: (todofns-register code closdp)
+  (let ((fn (todofns-lookup code closdp)))
+    (if fn
+      (todofns-id fn)
+      (begin
+        (set! todofns (cons (todofns-mk todons code closdp) todofns))
+        (set! todons (+ todons 1))
+        (- todons 1)))))
 
 (: todo-evvs '())
 (: todo-evns 1)
@@ -640,10 +682,7 @@
 
 (: (send-out-fns v closdp)
   (if (is-fn? v)
-    (begin
-      (set! todofns (cons (todofns-mk todons v closdp) todofns))
-      (set! todons (+ todons 1))
-      (- todons 1))
+    (todofns-register v closdp)
     (if (list? v)
       (map (lambda (x) (send-out-fns x closdp)) v)
       v)))
@@ -681,9 +720,7 @@
   (cond
     ((is-cquote? v) (list (list 'SMOOTH_CALL (cquote-value v))))
     ((is-fn? v)
-      (set! todofns (cons (todofns-mk todons v closdp) todofns))
-      (set! todons (+ todons 1))
-      (list (list 'SMOOTH__PUSH (- todons 1))))
+      (list (list 'SMOOTH__PUSH (todofns-register v closdp))))
 
     ((and (list? v) (is-evalready? v))
       (set! todo-evvs (cons (todo-evvs-mk todo-evns (send-out-fns v closdp) closdp) todo-evvs))
@@ -702,9 +739,7 @@
             ((is-primop? (cadr v))
               (list (list 'SMOOTH__PUSH (primop-path (cadr v)))))
             ((is-fn? (cadr v))
-              (set! todofns (cons (todofns-mk todons (cadr v) closdp) todofns))
-              (set! todons (+ todons 1))
-              (list (list 'SMOOTH__PUSH (- todons 1))))
+              (list (list 'SMOOTH__PUSH (todofns-register (cadr v) closdp))))
             (else (list (list 'SMOOTH__PUSH (cadr v)))))
           (docode (head v) closdp))))
     ((is-primop? v)
@@ -718,11 +753,8 @@
   (let ((s (if closdp '((SMOOTH_SET self (SMOOTH_CLOSURE_CAST (SMOOTH__POP)))) '((SMOOTH_SPDEC)))))
     (append s '((SMOOTH_SET local (SMOOTH__POP)))
       (if (is-fn? v)
-	(begin
-	  (set! todofns (cons (todofns-mk todons v true) todofns))
-	  (set! todons (+ todons 1))
-	  `((SMOOTH__PUSH
-            (smooth_closure_create ,(- todons 1) local ,(if closdp 'self 'NULL)))))
+        `((SMOOTH__PUSH
+          (smooth_closure_create ,(todofns-register v true) local ,(if closdp 'self 'NULL))))
 	(docode v true)))))
 
 (: (exdepth x) (cond ((is-fn? x) 0) ((list? x) (+ (max (exdepth (cadr x)) (- (exdepth (car x)) 1)) 1)) (else 0)))
@@ -785,8 +817,20 @@
   `(SMOOTH_SET ,(string-append "smooth_preval_" (number->string (todo-evvs-id e)))
      ,(tocstr (todo-evvs-code (prim-full-paths (re-aritise e))))))
 
+(: (docode-reroll c)
+  (if (or (null? c) (null? (cdr c))) c
+    (let loop ((n 1) (nex (car c)) (rem (cdr c)))
+        (if (null? rem)
+          (if (= n 1) (list nex) (list (list 'SMOOTH_REPEAT nex n)))
+          (if (equal? (car rem) nex)
+            (loop (+ n 1) nex (cdr rem))
+            (cons
+              (if (= n 1) nex (list 'SMOOTH_REPEAT nex n))
+              (loop 1 (car rem) (cdr rem))))))))
+
+
 (: (docode-complete v)
-  (let ((dc (docode v false)))
+  (let ((dc (docode-reroll (docode v false))))
     (let loop ((ac (list (cons 0 (cons (exdepth v) dc)))))
       (if (null? todofns)
 
@@ -802,9 +846,11 @@
             (cons
               (cons (todofns-id nex)
                 (cons (exdepth (caddr (todofns-code nex)))
-                  (docode-lambda
-                    (depth-align-var (caddr (todofns-code nex)) (cadr (todofns-code nex)))
-                    (todofns-closdp nex)))) ac)))))))
+                  (docode-reroll
+                    (docode-lambda
+                      (depth-align-var (caddr (todofns-code nex)) (cadr (todofns-code nex)))
+                      (todofns-closdp nex)))))
+              ac)))))))
 
 (: (get-init-mods)  (list '("smoothlang_anc2020_iochar")))
 (: (init-mods-values) (any (lambda (x) (not (list? x))) (get-init-mods)))
@@ -869,6 +915,7 @@
 /**********************************/
 
 void smooth_execute (void) {
+  unsigned long int i;
   smooth_closure_t* self;
   smooth_t local;
 "

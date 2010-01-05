@@ -35,11 +35,15 @@
 #define SMOOTH_C_PARENT(x)       SMOOTH_CLOSURE_PARENT(x)
 
 
-#define SMOOTH_PUSH(x)  smooth_push((smooth_t) x)
-#define SMOOTH_POP()    smooth_pop()
-
 #define SMOOTH_APPLY(x, y)       smooth_apply((smooth_t) x, (smooth_t) y)
 #define SMOOTH_SPARK_APPLY(x, y) smooth_spark_apply((smooth_t) x, (smooth_t) y)
+
+
+#define SMOOTH_GC_REGISTER(p, f) smooth_gc_register((smooth_t) p, (void (*)(smooth_t)) f)
+#define SMOOTH_GC_ALLOCATE(s, f) smooth_gc_allocate((smooth_t) s, (void (*)(smooth_t)) f)
+
+#define SMOOTH_GC_INCREF(p)      smooth_gc_incref((smooth_t) p)
+#define SMOOTH_GC_DECREF(p)      smooth_gc_decref((smooth_t) p)
 
 
 #ifndef SMOOTH__T_TYPE
@@ -51,6 +55,8 @@ struct smooth_closure;
 typedef struct smooth_closure smooth_closure_t;
 
 
+/* As stated above, you are recommended to use the macros instead. */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -61,16 +67,13 @@ extern "C" {
   smooth_closure_t* smooth_closure_parent (smooth_closure_t* c);
 
 
-  smooth_t smooth_pop  (void);
-  void     smooth_push (smooth_t x);
-
-
   smooth_t smooth_apply       (smooth_t x, smooth_t y);
   smooth_t smooth_spark_apply (smooth_t x, smooth_t y);
 
 
   void  smooth_gc_register (smooth_t ptr,  void (*freeptr)(smooth_t));
   void* smooth_gc_allocate (smooth_t size, void (*freeptr)(smooth_t));
+
   void  smooth_gc_incref   (smooth_t ptr);
   void  smooth_gc_decref   (smooth_t ptr);
 

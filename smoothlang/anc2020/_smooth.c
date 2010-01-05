@@ -1,17 +1,26 @@
 
 #include "smoothlang/anc2020/_smooth.h"
 
-#ifndef __include__
-#  define __include__ include
+#ifndef __inline__
+#  if __STDC_VERSION__ >= 199901L
+#    define __inline__ inline
+#  else
+#    define __inline__ /*inline*/
+#  endif
 #endif
 
 #ifndef __restrict__
-#  define __restrict__ restrict
+#  if __STDC_VERSION__ >= 199901L
+#    define __restrict__ restrict
+#  else
+#    define __restrict__ /*restrict*/
+#  endif
 #endif
 
 
 /* Temporary defn until we properly implement an array of gc'd memory */
-void* malloc (smooth_t s);
+typedef unsigned long int size_t;
+void* malloc (size_t s);
 void smooth_execute (void);
 
 
@@ -231,18 +240,11 @@ void smooth_gc_decref (smooth_t ptr) {
 
 /**********************************/
 
-
-void smooth_push (smooth_t x) {
-#ifdef SMOOTH_FIXED_STACK
-  SMOOTH__PUSH(x);
-#else
+#ifndef SMOOTH_FIXED_STACK
+void smooth_la_push (smooth_t x) {
   if (smooth_sp >= smooth_stack->length) {
     smooth_stack = smooth__linked_array_grow(smooth_stack);
   }
   *smooth__linked_array_get(smooth_stack, smooth_sp++) = x;
+}
 #endif
-}
-
-smooth_t smooth_pop (void) {
-  return SMOOTH__POP();
-}
