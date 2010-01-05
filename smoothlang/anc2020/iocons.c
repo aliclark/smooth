@@ -23,8 +23,8 @@ void  free   (void* p);
 void* malloc (size_t s);
 
 typedef struct iocons_s {
-  smooth_t x;
-  smooth_t y;
+  smooth_t x; /* The IO value */
+  smooth_t y; /* The RealWorld value */
 } iocons_t;
 
 static void iocons_free (smooth_t a) {

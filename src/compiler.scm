@@ -655,7 +655,7 @@
         (- todons 1)))))
 
 (: todo-evvs '())
-(: todo-evns 1)
+(: todo-evns 0)
 
 (: (todo-evvs-mk id code closdp) (list id code closdp))
 (: (todo-evvs-id x)     (car x))
@@ -716,6 +716,11 @@
 ; We need to go through the fns sending them out.
 
 
+;; This will allow us to replace eg. (numeral_to_ulint (\ ...)) with (cquote 44)
+;; before the function gets sent onto the todo list.
+(: (primop-call-optimisable? v) #f)
+(: (primop-call-optimise v)     v)
+
 (: (docode v closdp)
   (cond
     ((is-cquote? v) (list (list 'SMOOTH_CALL (cquote-value v))))
@@ -725,23 +730,25 @@
     ((and (list? v) (is-evalready? v))
       (set! todo-evvs (cons (todo-evvs-mk todo-evns (send-out-fns v closdp) closdp) todo-evvs))
       (set! todo-evns (+ todo-evns 1))
-      (list (list 'SMOOTH__PUSH (string-append "smooth_preval_" (number->string (- todo-evns 1))))))
+      (list (list 'SMOOTH__PUSH (string-append "smooth_preval[" (number->string (- todo-evns 1)) "]"))))
 
     ;; If we reach here we have a function call, so we pop the arguments first.
     ((list? v)
       (if (= (length v) 1)
         (docode (car v) closdp)
-        (append
-          (cond
-	    ((is-cquote? (cadr v)) (list (list 'SMOOTH__PUSH (cquote-value (cadr v)))))
-            ((and (not (is-fn? (cadr v))) (list? (cadr v)))
-              (docode (cadr v) closdp))
-            ((is-primop? (cadr v))
-              (list (list 'SMOOTH__PUSH (primop-path (cadr v)))))
-            ((is-fn? (cadr v))
-              (list (list 'SMOOTH__PUSH (todofns-register (cadr v) closdp))))
-            (else (list (list 'SMOOTH__PUSH (cadr v)))))
-          (docode (head v) closdp))))
+        (if (and (is-primop? (head v)) (primop-call-optimisable? v))
+          (primop-call-optimise v)
+          (append
+            (cond
+              ((is-cquote? (cadr v)) (list (list 'SMOOTH__PUSH (cquote-value (cadr v)))))
+              ((and (not (is-fn? (cadr v))) (list? (cadr v)))
+                (docode (cadr v) closdp))
+              ((is-primop? (cadr v))
+                (list (list 'SMOOTH__PUSH (primop-path (cadr v)))))
+              ((is-fn? (cadr v))
+                (list (list 'SMOOTH__PUSH (todofns-register (cadr v) closdp))))
+              (else (list (list 'SMOOTH__PUSH (cadr v)))))
+            (docode (head v) closdp)))))
     ((is-primop? v)
       (list (list (string-append "PRIMCALL_" (number->string (primop-arity v))) (primop-path v))))
     (else (list (list 'SMOOTH__PUSH v)))))
@@ -814,7 +821,7 @@
     (if (symbol? c) (primop-path c) c)))
 
 (: (do-evv e)
-  `(SMOOTH_SET ,(string-append "smooth_preval_" (number->string (todo-evvs-id e)))
+  `(SMOOTH_SET ,(string-append "smooth_preval[" (number->string (todo-evvs-id e)) "]")
      ,(tocstr (todo-evvs-code (prim-full-paths (re-aritise e))))))
 
 (: (docode-reroll c)
@@ -880,8 +887,6 @@
     (string-append "
 #include \"smoothlang/anc2020/_smooth.h\"
 
-/***********************************/
-
 "
 (apply string-append
   (map
@@ -890,29 +895,16 @@
                   ");\n"))
     (get-init-mods)))
 "
-/***********************************/
-
 "
 (apply string-append
   (map
     (lambda (p)
-      (string-append "smooth_t " (cadr p) "__" (symbol->string (car p)) (if (= (cddr p) 0) "" (string-append " (" (implode ", " (n-of "const smooth_t" (cddr p))) ")")) " __attribute__((const));\n"))
+      (string-append "smooth_t " (cadr p) "__" (symbol->string (car p))
+        (if (= (cddr p) 0) "" (string-append " (" (implode ", " (n-of "const smooth_t" (cddr p))) ")"))
+        (if (= (cddr p) 0) "" " __attribute__((const))") ";\n"))
     (table->list primops)))
 "
-/**********************************/
-
-"
-(let loop ((i (- td 1)) (shizmick '()))
-  (if (= i 0)
-    (implode "\n" shizmick)
-    (loop (- i 1)
-      (cons
-        (string-append "static smooth_t smooth_preval_" (number->string i)
-          " __attribute__((const));")
-        shizmick))))
-"
-
-/**********************************/
+static smooth_t smooth_preval[" (number->string td) "];
 
 void smooth_execute (void) {
   unsigned long int i;
@@ -937,8 +929,6 @@ jump:
 (instructions-string (cdaadr tc) false))
 "
 }
-
-/**********************************/
 
 int main (" (if (init-mods-values) "const int argc, const char** const argv" "void") ") {
 
