@@ -7,15 +7,10 @@
 DEPS=(smoothlang/anc2020/numeral.c smoothlang/anc2020/iochar.c smoothlang/anc2020/iocons.c)
 
 # Shouldn't be too to generate this one though
-OUTNAME=smoothlang_anc2020_test
-
-# These should only be added if "-D SMOOTH_FIXED_STACK" is found in the options
-SDEPS1="smoothlang/anc2020/linkedarray/ali_memory.c smoothlang/anc2020/linkedarray/ali_linked_array.c"
-SDEPS2=""
-SDEPS=$SDEPS1
+OUTNAME="smoothlang_anc2020_test"
 
 # Holds the bulk of the runtime
-CORE=(smoothlang/anc2020/_smooth.c)
+CORE="smoothlang/anc2020/_smooth.c"
 
 OUT1="-o $OUTNAME"
 OUT2="-S"
@@ -27,4 +22,4 @@ OUT=$OUT1
 # Todo: expose an option for this
 CCC=clang
 
-./src/compiler.scm $1 | $CCC $OUT -I. -xc ${@:2} $SDEPS $CORE ${DEPS[@]} -
+./src/compiler.scm $1 | $CCC $OUT -I. -xc ${@:2} $CORE ${DEPS[@]} -

@@ -718,8 +718,27 @@
 
 ;; This will allow us to replace eg. (numeral_to_ulint (\ ...)) with (cquote 44)
 ;; before the function gets sent onto the todo list.
-(: (primop-call-optimisable? v) #f)
-(: (primop-call-optimise v)     v)
+
+(: (numeral_to_ulint_opt v)
+  (if (and (is-fn? v) (is-fn? (caddr v)))
+    (let ((f (cadr v)) (x (cadr (caddr v))))
+      (let loop ((n 0) (c (caddr (caddr v))))
+        (if (symbol? c)
+          (if (eq? c x) n #f)
+          (if (and (list? c) (eq? (car c) f))
+            (loop (+ n 1) (cadr c))
+            #f))))
+    #f))
+
+(: (primop-call-optimise v)
+(display (car v))
+(newline)
+  (if (eq? (car v) 'numeral_to_ulint)
+    (let ((opt (numeral_to_ulint_opt v)))
+      (if opt
+        opt
+        v))
+    v))
 
 (: (docode v closdp)
   (cond
@@ -736,7 +755,7 @@
     ((list? v)
       (if (= (length v) 1)
         (docode (car v) closdp)
-        (if (and (is-primop? (head v)) (primop-call-optimisable? v))
+        (if (is-primop? (head v))
           (primop-call-optimise v)
           (append
             (cond

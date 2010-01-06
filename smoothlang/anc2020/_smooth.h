@@ -4,8 +4,21 @@
 
 #include "smoothlang/anc2020/smooth.h"
 
+
 #ifndef SMOOTH_FIXED_STACK
-#include "smoothlang/anc2020/linkedarray/ali_linked_array.h"
+
+/*
+ * Please do not allocate one of these yourself;
+ * use linked_array_allocate if you want one.
+ */
+typedef struct smooth_linked_array {
+	smooth_t* array; /* The block of allocated memory for array contents. */
+	smooth_t max;      /* The max capacity of the array memory for this head. */
+	smooth_t length;   /* Holds the value (max*2), saving on calculation time. */
+	struct smooth_linked_array* rest; /* The other half of the linked_array. */
+} smooth_linked_array_t;
+
+
 #endif
 
 
@@ -35,8 +48,8 @@
 #  define SMOOTH_SPOFF(x) smooth_sp[x]
 #else
 #  define SMOOTH_PUSH(x)  smooth_la_push(x)
-#  define SMOOTH_POP()    *smooth__linked_array_get(smooth_stack, --smooth_sp)
-#  define SMOOTH_SPOFF(x) *smooth__linked_array_get(smooth_stack, smooth_sp + (x))
+#  define SMOOTH_POP()    smooth_la_pop()
+#  define SMOOTH_SPOFF(x) smooth_la_spoff(smooth_sp + (x))
 #endif /* SMOOTH_FIXED_STACK */
 
 #define SMOOTH_TOS()   SMOOTH_SPOFF(-1)
@@ -105,6 +118,8 @@ extern "C" {
 
 #ifndef SMOOTH_FIXED_STACK
   void smooth_la_push (smooth_t x);
+  smooth_t smooth_la_pop (void);
+  smooth_linked_array_t *smooth__linked_array_allocate (smooth_t length);
 #endif
 
 #ifdef __cplusplus
