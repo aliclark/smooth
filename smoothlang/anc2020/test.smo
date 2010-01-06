@@ -1,7 +1,7 @@
 
 (include smoothlang/anc2020/iocons  (iocons 2) (iocons_car 1) (iocons_cdr 1))
 (include smoothlang/anc2020/numeral (numeral_to_ulint 1) (ulint_to_numeral 1))
-(include smoothlang/anc2020/iochar  stdin stdout (cfputc 3) (cfgetc 2))
+(include smoothlang/anc2020/iochar  stdin stdout (iochar_init 1) (cfputc 3) (cfgetc 2))
 
 
 (: (id x)      x)
@@ -101,9 +101,11 @@
 
 (: main
   run
-    (putstr
-      (cons 'H' (cons 'e' (cons 'l' (cons 'l' (cons 'o' (cons '\s'
-      (cons 'W' (cons 'o' (cons 'r' (cons 'l' (cons 'd' (cons '!' nil))))))))))))))
+    (>>
+      iochar_init
+      (putstr
+        (cons 'H' (cons 'e' (cons 'l' (cons 'l' (cons 'o' (cons '\s'
+        (cons 'W' (cons 'o' (cons 'r' (cons 'l' (cons 'd' (cons '!' nil)))))))))))))))
 
 (: main1   run (>>= getchar  putchar))
 

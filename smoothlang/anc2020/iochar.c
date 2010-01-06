@@ -30,10 +30,11 @@ smooth_t smoothlang_anc2020_iochar__stdin;
 smooth_t smoothlang_anc2020_iochar__stdout;
 smooth_t smoothlang_anc2020_iochar__stderr;
 
-void smoothlang_anc2020_iochar (void) {
+smooth_t smoothlang_anc2020_iochar__iochar_init (smooth_t z) {
   smoothlang_anc2020_iochar__stdin  = (smooth_t) stdin;
   smoothlang_anc2020_iochar__stdout = (smooth_t) stdout;
   smoothlang_anc2020_iochar__stderr = (smooth_t) stderr;
+  return iocons(0, z);
 }
 
 smooth_t smoothlang_anc2020_iochar__cfputc_opt (smooth_t c, smooth_t s) {

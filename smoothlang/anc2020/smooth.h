@@ -61,6 +61,8 @@ typedef struct smooth_closure smooth_closure_t;
 extern "C" {
 #endif
 
+  extern smooth_t smooth_argc;
+  extern smooth_t smooth_argv;
 
   smooth_t          smooth_closure_create (smooth_t lambda, smooth_t local, smooth_closure_t* parent);
   smooth_t          smooth_closure_local  (smooth_closure_t* c);

@@ -25,6 +25,9 @@ void smooth_execute (void);
 
 /**********************************/
 
+smooth_t smooth_argc;
+smooth_t smooth_argv;
+
 smooth_t smooth_pc = 0;
 
 #ifdef SMOOTH_FIXED_STACK
@@ -136,7 +139,6 @@ smooth_t smooth_spark_apply (smooth_t x, smooth_t y) {
   return rv;
 }
 
-
 /**********************************/
 
 
@@ -144,9 +146,6 @@ static smooth_th_t smooth_thread_alloc (void) {
   return 0;
 }
 
-/*
- * This runs when there are no more calls to make on a thread.
- */
 static __inline__ void smooth_thread_free (smooth_th_t th) {
 
 }

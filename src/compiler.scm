@@ -859,9 +859,6 @@
                       (todofns-closdp nex)))))
               ac)))))))
 
-(: (get-init-mods)  (list '("smoothlang_anc2020_iochar")))
-(: (init-mods-values) (any (lambda (x) (not (list? x))) (get-init-mods)))
-
 (: (optimize-equivalents tb)
   (docode-complete (table-ref tb main-sym)))
 
@@ -887,14 +884,6 @@
     (string-append "
 #include \"smoothlang/anc2020/_smooth.h\"
 
-"
-(apply string-append
-  (map
-    (lambda (x) (string-append "void " (if (list? x) (car x) x)
-                  " (" (if (list? x) "void" "int argc, const char** argv")
-                  ");\n"))
-    (get-init-mods)))
-"
 "
 (apply string-append
   (map
@@ -930,20 +919,15 @@ jump:
 "
 }
 
-int main (" (if (init-mods-values) "const int argc, const char** const argv" "void") ") {
+int main (const int argc, const char** const argv) {
+
+  smooth_argc = (smooth_t) argc;
+  smooth_argv = (smooth_t) argv;
 
 #ifndef SMOOTH_FIXED_STACK
   smooth_stack = smooth__linked_array_allocate(SMOOTH_STACK_SIZE);
 #endif
 
-"
-(apply string-append
-  (map
-    (lambda (x) (string-append "  " (if (list? x) (car x) x)
-                  "(" (if (list? x) "" "argc, argv")
-                  ");\n"))
-    (get-init-mods)))
-"
 "
 (instructions-string (append tv (cddr (car tc))) false)
 "
