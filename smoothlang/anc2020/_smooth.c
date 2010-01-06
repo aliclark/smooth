@@ -166,18 +166,6 @@ static smooth_linked_array_t *smooth__linked_array_grow (smooth_linked_array_t *
   return a;
 }
 
-static smooth_linked_array_t *smooth__linked_array_shrink (smooth_linked_array_t *list) {
-  smooth_linked_array_t *rest = list->rest;
-  
-  if (!rest || !rest->rest) {
-    perror( "Error: Tried to shrink linked_array "
-            "beyond initial size.");
-    exit( EXIT_FAILURE);
-  }
-  smooth__linked_array_free_head( list);
-  return rest;
-}
-
 /*---------------------------------------------------------------------------*/
 
 smooth_t smooth_la_spoff (smooth_t index) {
