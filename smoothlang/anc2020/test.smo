@@ -63,8 +63,10 @@
 (: head       compose fst snd)
 (: tail       compose snd snd)
 
+(: (append xs ys) if (null? xs) ys (cons (head xs) (append (tail xs) ys)))
 (: (foldr f z xs) if (null? xs) z  (f (head xs) (foldr f z (tail xs))))
 (: (map f xs)     if (null? xs) xs (cons (f (head xs)) (map f (tail xs))))
+(: (reverse l)    if (null? l)  l  (append (reverse (tail l)) (cons (head l) nil)))
 
 
 (: return            iocons)

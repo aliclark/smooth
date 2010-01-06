@@ -21,7 +21,8 @@
 #  endif
 #endif
 
-
+#define LOCAL                  local
+#define SELF                   self
 #define SMOOTH_SET(a, b)       a = b
 #define SMOOTH_CLOSURE_CAST(a) ((smooth_closure_t*) a)
 #define SMOOTH_REPEAT(c, n)    for (i = n; i > 0; --i) { c; }
@@ -46,12 +47,12 @@
 
 
 #ifdef SMOOTH_FIXED_STACK
-#  define SMOOTH__PUSH(x) *smooth_sp++ = ((smooth_t) (x))
-#  define SMOOTH__POP()   (*--smooth_sp)
+#  define SMOOTH_PUSH(x) *smooth_sp++ = ((smooth_t) (x))
+#  define SMOOTH_POP()   (*--smooth_sp)
 #  define SMOOTH_SPOFF(x) smooth_sp[x]
 #else
-#  define SMOOTH__PUSH(x) smooth_la_push(x)
-#  define SMOOTH__POP()   *smooth__linked_array_get(smooth_stack, --smooth_sp)
+#  define SMOOTH_PUSH(x) smooth_la_push(x)
+#  define SMOOTH_POP()   *smooth__linked_array_get(smooth_stack, --smooth_sp)
 #  define SMOOTH_SPOFF(x) *smooth__linked_array_get(smooth_stack, smooth_sp + (x))
 #endif /* SMOOTH_FIXED_STACK */
 

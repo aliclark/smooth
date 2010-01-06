@@ -725,12 +725,12 @@
   (cond
     ((is-cquote? v) (list (list 'SMOOTH_CALL (cquote-value v))))
     ((is-fn? v)
-      (list (list 'SMOOTH__PUSH (todofns-register v closdp))))
+      (list (list 'SMOOTH_PUSH (todofns-register v closdp))))
 
     ((and (list? v) (is-evalready? v))
       (set! todo-evvs (cons (todo-evvs-mk todo-evns (send-out-fns v closdp) closdp) todo-evvs))
       (set! todo-evns (+ todo-evns 1))
-      (list (list 'SMOOTH__PUSH (string-append "smooth_preval[" (number->string (- todo-evns 1)) "]"))))
+      (list (list 'SMOOTH_PUSH (string-append "smooth_preval[" (number->string (- todo-evns 1)) "]"))))
 
     ;; If we reach here we have a function call, so we pop the arguments first.
     ((list? v)
@@ -740,28 +740,28 @@
           (primop-call-optimise v)
           (append
             (cond
-              ((is-cquote? (cadr v)) (list (list 'SMOOTH__PUSH (cquote-value (cadr v)))))
+              ((is-cquote? (cadr v)) (list (list 'SMOOTH_PUSH (cquote-value (cadr v)))))
               ((and (not (is-fn? (cadr v))) (list? (cadr v)))
                 (docode (cadr v) closdp))
               ((is-primop? (cadr v))
-                (list (list 'SMOOTH__PUSH (primop-path (cadr v)))))
+                (list (list 'SMOOTH_PUSH (primop-path (cadr v)))))
               ((is-fn? (cadr v))
-                (list (list 'SMOOTH__PUSH (todofns-register (cadr v) closdp))))
-              (else (list (list 'SMOOTH__PUSH (cadr v)))))
+                (list (list 'SMOOTH_PUSH (todofns-register (cadr v) closdp))))
+              (else (list (list 'SMOOTH_PUSH (cadr v)))))
             (docode (head v) closdp)))))
     ((is-primop? v)
       (list (list (string-append "PRIMCALL_" (number->string (primop-arity v))) (primop-path v))))
-    (else (list (list 'SMOOTH__PUSH v)))))
+    (else (list (list 'SMOOTH_PUSH v)))))
 
 ;; When we encounter a new variable that must be closed over,
 ;; we ensure first that we convert references to those expressions into
 ;; a call up the closure chain to get the right variable.
 (: (docode-lambda v closdp)
-  (let ((s (if closdp '((SMOOTH_SET self (SMOOTH_CLOSURE_CAST (SMOOTH__POP)))) '((SMOOTH_SPDEC)))))
-    (append s '((SMOOTH_SET local (SMOOTH__POP)))
+  (let ((s (if closdp '((SMOOTH_SET SELF (SMOOTH_CLOSURE_CAST (SMOOTH_POP)))) '((SMOOTH_SPDEC)))))
+    (append s '((SMOOTH_SET LOCAL (SMOOTH_POP)))
       (if (is-fn? v)
-        `((SMOOTH__PUSH
-          (smooth_closure_create ,(todofns-register v true) local ,(if closdp 'self 'NULL))))
+        `((SMOOTH_PUSH
+          (SMOOTH_CLOSURE_CREATE ,(todofns-register v true) LOCAL ,(if closdp 'SELF 'NULL))))
 	(docode v true)))))
 
 (: (exdepth x) (cond ((is-fn? x) 0) ((list? x) (+ (max (exdepth (cadr x)) (- (exdepth (car x)) 1)) 1)) (else 0)))
@@ -769,8 +769,8 @@
 (: (clos-lookup n)
   (cquote
     (if (= n 0)
-      'local
-      `(SMOOTH__CLOSURE_LOCAL ,(listndeep 'SMOOTH__CLOSURE_PARENT 'self (- n 1))))))
+      'LOCAL
+      `(SMOOTH__CLOSURE_LOCAL ,(listndeep 'SMOOTH__CLOSURE_PARENT 'SELF (- n 1))))))
 
 (: (depth-align-varn expression vname n)
   (cond

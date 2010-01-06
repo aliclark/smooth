@@ -57,7 +57,7 @@ static void smooth_gc (void);
 /**********************************/
 
 static __inline__ void smooth_call_lambda (smooth_t x) {
-  SMOOTH__PUSH(NULL);
+  SMOOTH_PUSH(NULL);
   smooth_pc = x;
   smooth_execute();
 }
@@ -70,18 +70,18 @@ static __inline__ void smooth_call_closure (smooth_t x) {
   smooth_t code = SMOOTH__CLOSURE_CODE(x);
   smooth_t local;
   if (SMOOTH_LAMBDA_P(code)) {
-    SMOOTH__PUSH(x);
+    SMOOTH_PUSH(x);
     smooth_pc = code;
     smooth_execute();
   } else {
-    local = SMOOTH__POP();
-    SMOOTH__PUSH(((smooth_t (*)(smooth_closure_t*, smooth_t)) code)((smooth_closure_t*) x, local));
+    local = SMOOTH_POP();
+    SMOOTH_PUSH(((smooth_t (*)(smooth_closure_t*, smooth_t)) code)((smooth_closure_t*) x, local));
   }
 }
 
 static __inline__ void smooth_call_primitive (smooth_t fn) {
-  smooth_t local = SMOOTH__POP();
-  SMOOTH__PUSH(((smooth_t (*)(smooth_t)) fn)(local));
+  smooth_t local = SMOOTH_POP();
+  SMOOTH_PUSH(((smooth_t (*)(smooth_t)) fn)(local));
 }
 
 void smooth__call (smooth_t x) {
@@ -107,11 +107,11 @@ void smooth_call (smooth_t x) {
 
 
 static smooth_t smooth_apply_lambda (smooth_t x, smooth_t y) {
-  SMOOTH__PUSH(y);
-  SMOOTH__PUSH(NULL);
+  SMOOTH_PUSH(y);
+  SMOOTH_PUSH(NULL);
   smooth_pc = x;
   smooth_execute();
-  return SMOOTH__POP();
+  return SMOOTH_POP();
 }
 
 /*
@@ -122,11 +122,11 @@ static smooth_t smooth_apply_closure (smooth_t x, smooth_t y) {
   smooth_t code = SMOOTH__CLOSURE_CODE(x);
 
   if (SMOOTH_LAMBDA_P(code)) {
-    SMOOTH__PUSH(y);
-    SMOOTH__PUSH(x);
+    SMOOTH_PUSH(y);
+    SMOOTH_PUSH(x);
     smooth_pc = code;
     smooth_execute();
-    return SMOOTH__POP();
+    return SMOOTH_POP();
   } else {
     return ((smooth_t (*)(smooth_closure_t*, smooth_t)) code)((smooth_closure_t*) x, y);
   }
