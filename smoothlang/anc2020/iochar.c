@@ -53,7 +53,7 @@ smooth_t smoothlang_anc2020_iochar__cfgetc (smooth_t s, smooth_t i) {
 }
 
 /* If we get *really* good at optimisation,
- * we might be able to replace consequetive fputc calls with this. */
+ * we might be able to replace consequetive cfputc_opt calls with this. */
 smooth_t smoothlang_anc2020_iochar__cfputs_opt (smooth_t x, smooth_t s) {
   return fputs((char*) x, (FILE*) s);
 }

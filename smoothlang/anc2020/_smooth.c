@@ -20,6 +20,7 @@
 /* Temporary defn until we properly implement an array of gc'd memory */
 typedef unsigned long int size_t;
 void* malloc (size_t s);
+
 void smooth_execute (void);
 
 /**********************************/
@@ -45,10 +46,6 @@ static __inline__ void smooth_call_lambda    (smooth_t x);
 static __inline__ void smooth_call_closure   (smooth_t x);
 static __inline__ void smooth_call_primitive (smooth_t x);
 static __inline__ void smooth_thread_free    (smooth_th_t th);
-
-static smooth_t smooth_apply_lambda    (smooth_t x, smooth_t y);
-static smooth_t smooth_apply_closure   (smooth_t x, smooth_t y);
-static smooth_t smooth_apply_primitive (smooth_t x, smooth_t y);
 
 static smooth_th_t smooth_thread_alloc (void);
 
@@ -84,14 +81,6 @@ static __inline__ void smooth_call_primitive (smooth_t fn) {
   SMOOTH_PUSH(((smooth_t (*)(smooth_t)) fn)(local));
 }
 
-void smooth__call (smooth_t x) {
-  if (SMOOTH_CLOSURE_P(x)) {
-    smooth_call_closure(x);
-  } else {
-    smooth_call_primitive(x);
-  }
-}
-
 void smooth_call (smooth_t x) {
   if (SMOOTH_CLOSURE_P(x)) {
     smooth_call_closure(x);
@@ -102,38 +91,49 @@ void smooth_call (smooth_t x) {
   }
 }
 
+/**********************************/
+
+#ifndef SMOOTH_FIXED_STACK
+void smooth_la_push (smooth_t x) {
+  if (smooth_sp >= smooth_stack->length) {
+    smooth_stack = smooth__linked_array_grow(smooth_stack);
+  }
+  *smooth__linked_array_get(smooth_stack, smooth_sp++) = x;
+}
+#endif
 
 /**********************************/
 
-
-static smooth_t smooth_apply_lambda (smooth_t x, smooth_t y) {
-  SMOOTH_PUSH(y);
-  SMOOTH_PUSH(NULL);
-  smooth_pc = x;
-  smooth_execute();
-  return SMOOTH_POP();
-}
-
-/*
-This does not permit having another closure as the code part of the closure.
-I'm not sure that we would ever want a closure as the code part.
-*/
-static smooth_t smooth_apply_closure (smooth_t x, smooth_t y) {
-  smooth_t code = SMOOTH__CLOSURE_CODE(x);
-
-  if (SMOOTH_LAMBDA_P(code)) {
+smooth_t smooth_apply (smooth_t x, smooth_t y) {
+  smooth_t code;
+  if (SMOOTH_CLOSURE_P(x)) {
+    code = SMOOTH__CLOSURE_CODE(x);
+    if (SMOOTH_LAMBDA_P(code)) {
+      SMOOTH_PUSH(y);
+      SMOOTH_PUSH(x);
+      smooth_pc = code;
+      smooth_execute();
+      return SMOOTH_POP();
+    } else {
+      return ((smooth_t (*)(smooth_closure_t*, smooth_t)) code)((smooth_closure_t*) x, y);
+    }
+    return smooth_apply_closure(x, y);
+  } else if (SMOOTH_LAMBDA_P(x)) {
     SMOOTH_PUSH(y);
-    SMOOTH_PUSH(x);
-    smooth_pc = code;
+    SMOOTH_PUSH(NULL);
+    smooth_pc = x;
     smooth_execute();
     return SMOOTH_POP();
   } else {
-    return ((smooth_t (*)(smooth_closure_t*, smooth_t)) code)((smooth_closure_t*) x, y);
+    return ((smooth_t (*)(smooth_t)) x)(y);
   }
 }
 
-static smooth_t smooth_apply_primitive (smooth_t x, smooth_t y) {
-  return ((smooth_t (*)(smooth_t)) x)(y);
+smooth_t smooth_spark_apply (smooth_t x, smooth_t y) {
+  smooth_th_t th = smooth_thread_alloc();
+  smooth_t rv    = smooth_apply(x, y);
+  smooth_thread_free(th);
+  return rv;
 }
 
 
@@ -150,36 +150,6 @@ static smooth_th_t smooth_thread_alloc (void) {
 static __inline__ void smooth_thread_free (smooth_th_t th) {
 
 }
-
-/*
- * Clean up some space. World must be stopped or
- * an address registered in C may be cleared before the C code has time to push it to stack.
- */
-static void smooth_gc (void) {
-
-}
-
-
-/**********************************/
-
-
-smooth_t smooth_apply (smooth_t x, smooth_t y) {
-  if (SMOOTH_CLOSURE_P(x)) {
-    return smooth_apply_closure(x, y);
-  } else if (SMOOTH_LAMBDA_P(x)) {
-    return smooth_apply_lambda(x, y);
-  } else {
-    return smooth_apply_primitive(x, y);
-  }
-}
-
-smooth_t smooth_spark_apply (smooth_t x, smooth_t y) {
-  smooth_th_t th = smooth_thread_alloc();
-  smooth_t rv    = smooth_apply(x, y);
-  smooth_thread_free(th);
-  return rv;
-}
-
 
 /**********************************/
 
@@ -233,14 +203,11 @@ void smooth_gc_decref (smooth_t ptr) {
 
 }
 
+/*
+ * Clean up some space. World must be stopped or
+ * an address registered in C may be cleared before the C code has time to push it to stack.
+ */
+static void smooth_gc (void) {
 
-/**********************************/
-
-#ifndef SMOOTH_FIXED_STACK
-void smooth_la_push (smooth_t x) {
-  if (smooth_sp >= smooth_stack->length) {
-    smooth_stack = smooth__linked_array_grow(smooth_stack);
-  }
-  *smooth__linked_array_get(smooth_stack, smooth_sp++) = x;
 }
-#endif
+

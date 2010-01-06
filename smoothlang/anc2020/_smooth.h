@@ -29,30 +29,13 @@
 
 #define SMOOTH_CALL(x) smooth_call((smooth_t) x)
 
-/*
- * Something like this will be used sometime in the future,
- * but cannot be used conditionally.
- * Perhaps when I detect recursion I can use this instead?
- */
-#define SMOOTH__CALL(x) \
-  do { \
-    if (SMOOTH_LAMBDA_P(x)) { \
-      SMOOTH_PUSH(NULL); \
-      smooth_pc = x; \
-      goto jump; \
-    } else { \
-      smooth__call((smooth_t) x); \
-    } \
-  } while (0)
-
-
 #ifdef SMOOTH_FIXED_STACK
-#  define SMOOTH_PUSH(x) *smooth_sp++ = ((smooth_t) (x))
-#  define SMOOTH_POP()   (*--smooth_sp)
+#  define SMOOTH_PUSH(x)  *smooth_sp++ = ((smooth_t) (x))
+#  define SMOOTH_POP()    (*--smooth_sp)
 #  define SMOOTH_SPOFF(x) smooth_sp[x]
 #else
-#  define SMOOTH_PUSH(x) smooth_la_push(x)
-#  define SMOOTH_POP()   *smooth__linked_array_get(smooth_stack, --smooth_sp)
+#  define SMOOTH_PUSH(x)  smooth_la_push(x)
+#  define SMOOTH_POP()    *smooth__linked_array_get(smooth_stack, --smooth_sp)
 #  define SMOOTH_SPOFF(x) *smooth__linked_array_get(smooth_stack, smooth_sp + (x))
 #endif /* SMOOTH_FIXED_STACK */
 
@@ -118,8 +101,7 @@ extern "C" {
 
   extern smooth_closure_t smooth_closures[SMOOTH_CLOSURE_MEM];
 
-  void smooth_call  (smooth_t x);
-  void smooth__call (smooth_t x);
+  void smooth_call (smooth_t x);
 
 #ifndef SMOOTH_FIXED_STACK
   void smooth_la_push (smooth_t x);
