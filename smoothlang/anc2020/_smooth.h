@@ -48,7 +48,7 @@ typedef struct smooth_linked_array {
 #  define SMOOTH_SPOFF(x) smooth_sp[x]
 #else
 #  define SMOOTH_PUSH(x)  smooth_la_push(x)
-#  define SMOOTH_POP()    smooth_la_pop()
+#  define SMOOTH_POP()    smooth_la_spoff(--smooth_sp)
 #  define SMOOTH_SPOFF(x) smooth_la_spoff(smooth_sp + (x))
 #endif /* SMOOTH_FIXED_STACK */
 

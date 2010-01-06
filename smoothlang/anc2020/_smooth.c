@@ -180,30 +180,8 @@ static smooth_linked_array_t *smooth__linked_array_shrink (smooth_linked_array_t
 
 /*---------------------------------------------------------------------------*/
 
-
-/*
- * The following functions have the same general code inlined in 3 places,
- * because pop() and push() are such frequent calls they must be maximally quick.
- */
-
-
-/* This is the "1" in our O(1). It must be zippidy zip! */
 smooth_t smooth_la_spoff (smooth_t index) {
   smooth_linked_array_t *list = smooth_stack;
-  while (index < list->max) {
-    if (list->rest) {
-      list = list->rest;
-    } else {
-      return *(list->array + index);
-    }
-  }
-  return *(list->array + (index - list->max));
-}
-
-smooth_t smooth_la_pop (void)
-{
-  smooth_linked_array_t *list = smooth_stack;
-  smooth_t index = --smooth_sp;
   while (index < list->max) {
     if (list->rest) {
       list = list->rest;
