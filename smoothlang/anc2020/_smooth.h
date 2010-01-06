@@ -13,12 +13,6 @@
 #define NULL         0
 
 
-#ifndef __attribute__
-#  define __attribute__(x) /*__attribute(x)__*/
-#endif /* __attribute__ */
-
-
-
 #ifndef SMOOTH_STACK_SIZE
 #  ifdef SMOOTH_FIXED_STACK
 #    define SMOOTH_STACK_SIZE SMOOTH_FIXED_STACK

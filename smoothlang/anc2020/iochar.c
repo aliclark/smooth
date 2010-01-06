@@ -18,10 +18,13 @@
 
 #include "smoothlang/anc2020/smooth.h"
 
-#define  iocons smoothlang_anc2020_iocons__iocons
-smooth_t iocons (smooth_t, smooth_t);
-
 #include <stdio.h> /* Needed for definition of typedef FILE or stdin,stdout */
+
+#define iocons smoothlang_anc2020_iocons__iocons
+#define cfputc(c, s) putc((int) c, (FILE*) s)
+#define cfgetc(s)    getc((FILE*) s)
+
+smooth_t iocons (smooth_t, smooth_t);
 
 smooth_t smoothlang_anc2020_iochar__stdin;
 smooth_t smoothlang_anc2020_iochar__stdout;
@@ -33,27 +36,24 @@ void smoothlang_anc2020_iochar (void) {
   smoothlang_anc2020_iochar__stderr = (smooth_t) stderr;
 }
 
+smooth_t smoothlang_anc2020_iochar__cfputc_opt (smooth_t c, smooth_t s) {
+  return cfputc(c, s);
+}
+
+smooth_t smoothlang_anc2020_iochar__cfgetc_opt (smooth_t s) {
+  return cfgetc(s);
+}
+
 smooth_t smoothlang_anc2020_iochar__cfputc (smooth_t c, smooth_t s, smooth_t i) {
-  return iocons(putc(c, (FILE*) s), i);
+  return iocons(cfputc(c, s), i);
 }
 
 smooth_t smoothlang_anc2020_iochar__cfgetc (smooth_t s, smooth_t i) {
-  return iocons(getc((FILE*) s), i);
-}
-
-
-/* These can be used instead if our optimiser recognises opportunities to use them. */
-
-smooth_t smoothlang_anc2020_iochar__fputc_opt (smooth_t c, smooth_t s) {
-  return putc(c, (FILE*) s);
-}
-
-smooth_t smoothlang_anc2020_iochar__fgetc_opt (smooth_t s) {
-  return getc((FILE*) s);
+  return iocons(cfgetc(s), i);
 }
 
 /* If we get *really* good at optimisation,
  * we might be able to replace consequetive fputc calls with this. */
-smooth_t smoothlang_anc2020_iochar__fputs_opt (smooth_t x, smooth_t s) {
+smooth_t smoothlang_anc2020_iochar__cfputs_opt (smooth_t x, smooth_t s) {
   return fputs((char*) x, (FILE*) s);
 }

@@ -17,6 +17,28 @@
 
 #include "smoothlang/anc2020/smooth.h"
 
+/*
+ * IOCONS is not a normal data structure - it aims to optimise itself away.
+ *
+ * For any module function you write which uses IOCONS, please follow both these rules:
+ *
+ * a) The RealWorld argument to your function should always be passed as the last argument.
+ * b) You should create another version of your function without IOCONS or the last argument.
+ *    This version should be named similarly, but with _opt appended.
+ *
+ * eg.
+ *
+ * smooth_t smoothlang_anc2020_iochar__putchar_opt (smooth_t x) {
+ *   return putchar(x);
+ * }
+ *
+ * smooth_t smoothlang_anc2020_iochar__putchar (smooth_t x, smooth_t rw) {
+ *   return iocons(smoothlang_anc2020_iochar__putchar_opt(x), rw);
+ * }
+ *
+ */
+
+
 typedef unsigned long int size_t;
 
 void  free   (void* p);

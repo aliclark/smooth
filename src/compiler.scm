@@ -891,7 +891,7 @@
 (apply string-append
   (map
     (lambda (x) (string-append "void " (if (list? x) (car x) x)
-                  " (" (if (list? x) "void" "const int argc, const char** const argv")
+                  " (" (if (list? x) "void" "int argc, const char** argv")
                   ");\n"))
     (get-init-mods)))
 "
@@ -899,9 +899,9 @@
 (apply string-append
   (map
     (lambda (p)
-      (string-append "smooth_t " (cadr p) "__" (symbol->string (car p))
-        (if (= (cddr p) 0) "" (string-append " (" (implode ", " (n-of "const smooth_t" (cddr p))) ")"))
-        (if (= (cddr p) 0) "" " __attribute__((const))") ";\n"))
+      (string-append "extern smooth_t " (cadr p) "__" (symbol->string (car p))
+        (if (= (cddr p) 0) "" (string-append " (" (implode ", " (n-of "smooth_t" (cddr p))) ")"))
+        ";\n"))
     (table->list primops)))
 "
 static smooth_t smooth_preval[" (number->string td) "];

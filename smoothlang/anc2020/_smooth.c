@@ -17,12 +17,10 @@
 #  endif
 #endif
 
-
 /* Temporary defn until we properly implement an array of gc'd memory */
 typedef unsigned long int size_t;
 void* malloc (size_t s);
 void smooth_execute (void);
-
 
 /**********************************/
 
@@ -33,15 +31,13 @@ static smooth_t smooth_stack[SMOOTH_STACK_SIZE];
 smooth_t* __restrict__ smooth_sp = smooth_stack;
 #else
 smooth_linked_array_t* __restrict__ smooth_stack;
-smooth_t  smooth_sp = 0;
+smooth_t smooth_sp = 0;
 #endif
 
 /* The space for closures */
 smooth_closure_t smooth_closures[SMOOTH_CLOSURE_MEM];
 
 static smooth_closure_t* smooth_cp = smooth_closures + SMOOTH_CLOSURE_MEM;
-
-
 
 /**********************************/
 
@@ -56,7 +52,7 @@ static smooth_t smooth_apply_primitive (smooth_t x, smooth_t y);
 
 static smooth_th_t smooth_thread_alloc (void);
 
-static void smooth_gc      (void);
+static void smooth_gc (void);
 
 /**********************************/
 
