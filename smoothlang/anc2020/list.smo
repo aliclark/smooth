@@ -1,8 +1,8 @@
 
-(import smooth-lang/anc2020/pair)
-(import smooth-lang/anc2020/bool)
-(import smooth-lang/anc2020/lambda)
-(import smooth-lang/anc2020/numeral)
+(import smoothlang/anc2020/pair)
+(import smoothlang/anc2020/bool)
+(import smoothlang/anc2020/lambda)
+(import smoothlang/anc2020/numeral)
 
 (: (cons h t) pair false (pair h t))
 (: nil        fdup pair true)

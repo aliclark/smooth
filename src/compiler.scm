@@ -155,18 +155,77 @@
 ;
 ; Question: will (f (car xs)) func up?
 
+;
+; import smooth-lang/anc2020/list
+; import smooth-lang/anc2020/list prefixing list.
+; import smooth-lang/anc2020/list (cons head tail)
+; import smooth-lang/anc2020/list (cons head tail) prefixing list.
+;
+; reprovide smooth-lang/anc2020/list
+; reprovide smooth-lang/anc2020/list prefixing list.
+; reprovide smooth-lang/anc2020/list (cons head tail)
+; reprovide smooth-lang/anc2020/list (cons head tail) prefixing list.
+;
+
+;
+; scc smoothlang/anc2020/testmod
+;
+; 1) Start parsing testmod with the basic list/space parser.
+; 2) If parsed object is symbol, not a list, we die,
+; else ensure it's a macro def we know, or an import.
+; 3) If it's a macro we know the definition of, expand the code out.
+; 4) Repeat 2 and 3
+; 5) Now we have an import statement, we compile that module and import it.
+;
+
+
+
+;
+; In addition to symbols and lists, the compiler should have it's own reserved symbol format,
+; eg. (reserved symbol) or #'symbol
+;
+; The obvious drawback of such a syntax is that it exposes the internals of the compiler, making certain expressions off-limits to the user.
+; The big positive is that it exposes the internals of the compiler, allowing permanent format for code after intermediate compilation phases.
+;
+; Since (()foo) is currently a parser error, I have reassigned it to specify foo as an internal construct.
+;
+; Some example internal symbols: [a-zA-Z0-9_]
+; (()lambda) (()define) (()delay) (()force) (()begin) (()gensym 200) (()primop smoothlang_anc2020_iochar__cfgetc)
+;
+;
+; The compiler will actually only accept an incredibly basic language with no understanding of modules or macros.
+;
+; ((()lambda) x x)
+;
+; The refined version accepted by the compiler is a single lambda expression,
+; possibly with primop symbols, possibly some force/delay symbols and possibly with gensym symbols,
+; and completely beta reduced, such that the only work left is to print the equivalent C code.
+;
+
+;
+; parseC  ->  internalC  ->  parseB
+;                 V
+; parseB  ->  internalB  ->  parseA
+;                 V
+; parseA  ->  internalA  ->  C code
+;
+; Keeping modularity, each line is separate from the others and can be inputted
+; either using the file output of the last, or directly taking the internal representation used
+; for the outputting.
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; MISC LIBRARY CODEZ
 
-(: (inc x) (+ x 1))
+(define (inc x) (+ x 1))
 
-(: (set-diff a b)
+(define (set-diff a b)
   (if (null? b) a
     (if (contains? a (car b))
       (remove-item a (car b))
       (set-diff a (cdr b)))))
 
-(: (assoc-ref-nfv d n not-found-value)
+(define (assoc-ref-nfv d n not-found-value)
   (if (null? d)
     not-found-value
     ((lambda (nex)
@@ -175,7 +234,7 @@
         (assoc-ref-nfv (tail d) n not-found-value)))
       (head d))))
 
-(: (assoc-set lst key val)
+(define (assoc-set lst key val)
   (if (null? lst)
     (cons (pair key val) nil)
     ((lambda (next)
@@ -184,31 +243,31 @@
         (cons next (assoc-set (tail lst) key val))))
       (head lst))))
 
-(: (contains? l x)
+(define (contains? l x)
   (if (null? l) false (if (equal? (head l) x) true (contains? (tail l) x))))
 
-(: (ensure-contains l x) (if (contains? l x) l (cons x l)))
+(define (ensure-contains l x) (if (contains? l x) l (cons x l)))
 
-(: (ensure-merge l xs)
+(define (ensure-merge l xs)
   (if (null? xs) l
     (ensure-merge (ensure-contains l (head xs)) (tail xs))))
 
-(: (remove-item xs y)
+(define (remove-item xs y)
   (if (null? xs) nil
     (if (eq? (head xs) y) (remove-item (tail xs) y) (cons (head xs) (remove-item (tail xs) y)))))
 
-(: (uniques l)
+(define (uniques l)
   (if (null? l) nil
     (if (contains? (tail l) (head l))
       (uniques (tail l))
       (cons (head l) (uniques (tail l))))))
 
-(: (replace-all l x v)
+(define (replace-all l x v)
   (if (list? l)
     (map (lambda (l2) (replace-all l2 x v)) l)
     (if (eq? l x) v l)))
 
-(: (lookup hsh expression)
+(define (lookup hsh expression)
   ((lambda (fail)
     ((lambda (l)
       (if (eq? l fail)
@@ -217,9 +276,9 @@
       (table-ref hsh expression fail)))
     (gensym)))
 
-(: (first-is? sym l) (and (list? l) (and (not (null? l)) (eq? (head l) sym))))
+(define (first-is? sym l) (and (list? l) (and (not (null? l)) (eq? (head l) sym))))
 
-(: (implode- acc glue l)
+(define (implode- acc glue l)
   (if (null? l) acc
     (implode-
       (string-append acc
@@ -227,9 +286,9 @@
       glue
       (tail l))))
 
-(: (implode glue l) (implode- "" glue l))
+(define (implode glue l) (implode- "" glue l))
 
-(: (string-find x y)
+(define (string-find x y)
   (let ((xlen (string-length x)) (ylen (string-length y)))
     (let loop ((curx 0) (cury 0))
       (if (= cury ylen)
@@ -240,7 +299,7 @@
             (loop (inc curx) (inc cury))
             (loop (inc curx) 0)))))))
 
-(: (string-replace s a b)
+(define (string-replace s a b)
   (let ((alen (string-length a)))
     (let ((f (string-find s a)))
       (if f
@@ -248,7 +307,7 @@
           (string-replace (substring s (+ f alen) (string-length s)) a b))
         s))))
 
-(: (read-line d)
+(define (read-line d)
   (if (eof-object? (peek-char d))
     (peek-char d)
     (let loop ((acc nil))
@@ -257,46 +316,46 @@
           (list->string (reverse acc))
           (loop (cons c acc)))))))
 
-(: (read-lines d)
+(define (read-lines d)
   (let loop ((acc nil))
     (let ((l (read-line d)))
       (if (eof-object? l)
         (reverse acc)
         (loop (cons l acc))))))
 
-(: (read-all file)
+(define (read-all file)
   (let ((ip (open-input-file file)))
     (let loop ((acc nil))
       (let ((r (read ip)))
-	(if (eof-object? r)
-	  (begin (close-input-port ip) (reverse acc))
-	  (loop (cons r acc)))))))
+        (if (eof-object? r)
+          (begin (close-input-port ip) (reverse acc))
+          (loop (cons r acc)))))))
 
-(: (read-all-files files) (apply append (map read-all files)))
+(define (read-all-files files) (apply append (map read-all files)))
 
-(: (n-of x n) (if (= n 0) nil (cons x (n-of x (- n 1)))))
+(define (n-of x n) (if (= n 0) nil (cons x (n-of x (- n 1)))))
 
-(: (every pred v) (if (null? v) #t (and (pred (car v)) (every pred (cdr v)))))
-(: (any   pred v) (if (null? v) #f (or  (pred (car v)) (any pred (cdr v)))))
+(define (every pred v) (if (null? v) #t (and (pred (car v)) (every pred (cdr v)))))
+(define (any   pred v) (if (null? v) #f (or  (pred (car v)) (any pred (cdr v)))))
 
-(: (listndeep cpy it n) (if (= n 0) it (list cpy (listndeep cpy it (- n 1)))))
+(define (listndeep cpy it n) (if (= n 0) it (list cpy (listndeep cpy it (- n 1)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; DOMAIN SPECIFIC CODEZ
 
-(: begin-sym 'begin)
-(: def-sym   ':)
-(: fn-sym    (string->symbol "\\"))
-(: main-sym  'main)
+(define begin-sym 'begin)
+(define def-sym   ':)
+(define fn-sym    (string->symbol "\\"))
+(define main-sym  'main)
 
 ;; Since the compiler is going to be inserting lambdas,
 ;; we need to use a symbol for them that can't be shadowed.
-(: fn-gen-sym (gensym fn-sym))
+(define fn-gen-sym (gensym fn-sym))
 
-(: macros  (make-table))
-(: primops (make-table))
+(define macros  (make-table))
+(define primops (make-table))
 
-(: (macroexpand shadow-list form)
+(define (macroexpand shadow-list form)
   (if (and (list? form) (not (null? form))
         (not (keyword-is-shadowed? (head form) shadow-list)))
     (let ((v (table-ref macros (head form) false)))
@@ -305,22 +364,22 @@
         form))
     form))
  
-(: (is-begin?  thing) (first-is? begin-sym thing))
-(: (is-def?    thing) (first-is? def-sym   thing))
-(: (is-fn?     thing) (or (first-is? fn-sym thing) (is-gen-fn? thing)))
-(: (is-gen-fn? thing) (first-is? fn-gen-sym thing))
+(define (is-begin?  thing) (first-is? begin-sym thing))
+(define (is-def?    thing) (first-is? def-sym   thing))
+(define (is-fn?     thing) (or (first-is? fn-sym thing) (is-gen-fn? thing)))
+(define (is-gen-fn? thing) (first-is? fn-gen-sym thing))
 
-(: (is-primop? thing) (table-ref primops thing false))
+(define (is-primop? thing) (table-ref primops thing false))
 
-(: (keyword-is-shadowed? word slist) (contains? slist word))
+(define (keyword-is-shadowed? word slist) (contains? slist word))
 
-(: (begin-is-shadowed? slist) (keyword-is-shadowed? begin-sym slist))
-(: (def-is-shadowed?   slist) (keyword-is-shadowed? def-sym   slist))
-(: (fn-is-shadowed?    slist) (keyword-is-shadowed? fn-sym    slist))
+(define (begin-is-shadowed? slist) (keyword-is-shadowed? begin-sym slist))
+(define (def-is-shadowed?   slist) (keyword-is-shadowed? def-sym   slist))
+(define (fn-is-shadowed?    slist) (keyword-is-shadowed? fn-sym    slist))
 
-(: (primop-arity name) (cdr (table-ref primops name)))
-(: (primop-base  name) (car (table-ref primops name)))
-(: (primop-path  name) (string-append (car (table-ref primops name)) "__" (symbol->string name)))
+(define (primop-arity name) (cdr (table-ref primops name)))
+(define (primop-base  name) (car (table-ref primops name)))
+(define (primop-path  name) (string-append (car (table-ref primops name)) "__" (symbol->string name)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Parsing
@@ -332,30 +391,30 @@
 ; char=?, cspace, cnewline, ctab, coparen, ccparen, make-table
 ; peek-char, read-char, string->symbol, list->string, eof-object?, error
 
-(: (white-space? c) (and (not (eof-object? c)) (or (char=? c cspace) (or (char=? c cnewline) (char=? c ctab)))))
-(: (open-paren?  c) (and (not (eof-object? c)) (char=? c coparen)))
-(: (close-paren? c) (and (not (eof-object? c)) (char=? c ccparen)))
-(: (paren?       c) (or (open-paren? c) (close-paren? c)))
+(define (white-space? c) (and (not (eof-object? c)) (or (char=? c cspace) (or (char=? c cnewline) (char=? c ctab)))))
+(define (open-paren?  c) (and (not (eof-object? c)) (char=? c coparen)))
+(define (close-paren? c) (and (not (eof-object? c)) (char=? c ccparen)))
+(define (paren?       c) (or (open-paren? c) (close-paren? c)))
 
-(: read-table (make-table))
+(define read-table (make-table))
 
-(: (strip-spaces! p)
+(define (strip-spaces! p)
   ((lambda (c)
     (if (white-space? c)
       (begin (read-char p) (strip-spaces! p))
       false))
     (peek-char p)))
 
-(: (reads p s)
+(define (reads p s)
   ((lambda (c)
     (if (or (white-space? c) (paren? c))
       (string->symbol (list->string (reverse s)))
       (begin (read-char p) (reads p (cons c s)))))
     (peek-char p)))
 
-(: (read-symbol p) (reads p (cons (read-char p) nil)))
+(define (read-symbol p) (reads p (cons (read-char p) nil)))
 
-(: (readl p l)
+(define (readl p l)
   (begin
     (strip-spaces! p)
     ((lambda (c)
@@ -365,9 +424,9 @@
             (readl p (cons (read-symbol p) l))))))
       (peek-char p))))
 
-(: (read-list p) (begin (read-char p) (readl p nil)))
+(define (read-list p) (begin (read-char p) (readl p nil)))
 
-(: (read p)
+(define (read p)
   (begin
     (strip-spaces! p)
     ((lambda (c)
@@ -382,7 +441,7 @@
 
 ;; (fn () exp)           -> exp
 ;; (fn (v vs...) exp...) -> (fn v (fn (vs...) (exp...)))
-(: (expand-fn shadow-list thing)
+(define (expand-fn shadow-list thing)
   (cond
     ((< (length thing) 3)
       (error "Too few items in lambda expression: " thing))
@@ -404,19 +463,19 @@
     (else
       (expand-fn shadow-list (list (head thing) (caadr thing) (list fn-gen-sym (cdadr thing) (caddr thing)))))))
 
-(: (expand-single-apps xs)
+(define (expand-single-apps xs)
   (if (null? (cddr xs))
     xs
     (cons (expand-single-apps (butlast xs)) (cons (last xs) nil))))
 
 ;; Here we create a lambda of the same arity as the primop to ensure that
 ;; the primop is always called only when it has the right no. of args.
-(: (expand-primop-arity tmp n)
+(define (expand-primop-arity tmp n)
   (if (zero? n) tmp
     (let ((newvar (gensym)))
       (list fn-gen-sym newvar (expand-primop-arity (list tmp newvar) (- n 1))))))
 
-(: (expand-expression shadow-list thing)
+(define (expand-expression shadow-list thing)
   (let ((ex (macroexpand shadow-list thing)))
     (if (null? ex)
       (error "Empty list is invalid.")
@@ -433,7 +492,7 @@
                 (error "Unbound variable: " ex)))))))))
 
 ;; (def (f xs...) exp...) -> (def f (fn (xs...) (exp...)))
-(: (expand-def thing)
+(define (expand-def thing)
   (cond
     ((< (length thing) 3)
       (error "define form does not have enough body: " thing))
@@ -448,17 +507,17 @@
         (cons (head thing)
           (cons (caadr thing) (cons (cons fn-gen-sym (cons (cdadr thing) (cons (caddr thing) nil))) nil)))))))
 
-(: (expand-expressions-in-defs shadow-list codes)
+(define (expand-expressions-in-defs shadow-list codes)
   (let ((newvars (map cadr codes)))
     (if (= (length (uniques newvars)) (length newvars))
       (let ((newscope (ensure-merge shadow-list newvars)))
-	(map
-	  (lambda (code)
-	    (cons (head code) (cons (cadr code) (cons (expand-expression newscope (cddr code)) nil))))
-	  codes))
+        (map
+          (lambda (code)
+            (cons (head code) (cons (cadr code) (cons (expand-expression newscope (cddr code)) nil))))
+          codes))
       (error "Multiple definitions for a variable of the same name" (set-diff newvars (uniques newvars))))))
 
-(: (expand-statement shadow-list thing)
+(define (expand-statement shadow-list thing)
   (let ((ex (macroexpand shadow-list thing)))
     (cond
       ((and (not (begin-is-shadowed? shadow-list)) (is-begin? ex))
@@ -467,29 +526,29 @@
         (cons (expand-def ex) nil))
       (else (error "Not a define form at top level" ex)))))
 
-(: (expand-statements shadow-list code)
+(define (expand-statements shadow-list code)
   (expand-expressions-in-defs shadow-list
     (foldr append nil (map (partial expand-statement shadow-list) code))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Reduction - move the code into hash table and reduce main expression
 
-(: (codes->hash codes)
+(define (codes->hash codes)
   (let ((hsh (make-table)))
     ;; load the code into the hash table.
     (foldr (lambda (x acc) (table-set! hsh (cadr x) (caddr x)) 'done) 'done codes)
     hsh))
 
-(: (alpha-apply f v) (replace-all (caddr f) (cadr f) v))
+(define (alpha-apply f v) (replace-all (caddr f) (cadr f) v))
 
-(: (reducex-find-culprit f) (if (list? f) (reducex-find-culprit (head f)) f))
+(define (reducex-find-culprit f) (if (list? f) (reducex-find-culprit (head f)) f))
 
-(: (reducex-add-lookup-f expression f)
+(define (reducex-add-lookup-f expression f)
   (if (list? (head expression))
     (cons (reducex-add-lookup-f (head expression) f) (tail expression))
     (cons f (tail expression))))
 
-(: (reducex-rec-app hsh exnames fnnames locals tamep expression rex nexrex)
+(define (reducex-rec-app hsh exnames fnnames locals tamep expression rex nexrex)
   (let* ((f    (snd rex))
          (cul  (reducex-find-culprit f))
          (newf (reducex hsh (remove-item exnames cul) fnnames locals true cul))
@@ -497,18 +556,18 @@
                  (reducex-add-lookup-f expression (snd newf)))))
     (pair (ensure-merge (fst rv) (ensure-merge (fst rex) (fst nexrex))) (snd rv))))
 
-(: (reducex-been-applied? fnnames f arg)
+(define (reducex-been-applied? fnnames f arg)
   (contains? (assoc-ref-nfv fnnames f nil) arg))
 
-(: (reducex-do-app fnnames f arg)
+(define (reducex-do-app fnnames f arg)
   (assoc-set fnnames f (ensure-contains (assoc-ref-nfv fnnames f nil) arg)))
 
 ;;; TODO : finish implementation !!!!!!!!!!!!!!!
-(: (rfnapps-merge a b)
+(define (rfnapps-merge a b)
   b)
 ;  (if (null? a) b (rfnapps-merge (tail a) (dosummat (head a) b))))
 
-(: (reducex-gensym-locals f)
+(define (reducex-gensym-locals f)
   (if (is-fn? f)
     (let ((v (gensym (cadr f))))
       (cons (head f) (cons v (cons (replace-all (reducex-gensym-locals (caddr f)) (cadr f) v) nil))))
@@ -516,16 +575,16 @@
       (map reducex-gensym-locals f)
       f)))
 
-(: (robj deps exp fnapps) (cons deps (cons exp (cons fnapps nil))))
-(: rdeps   head)
-(: rexp    cadr)
-(: rfnapps caddr)
+(define (robj deps exp fnapps) (cons deps (cons exp (cons fnapps nil))))
+(define rdeps   head)
+(define rexp    cadr)
+(define rfnapps caddr)
 
 ;; if this is a recursive application that has already been done, we need to remember the
 ;; symbol as one of the dependancies.
 ;; but if (map ++) has been done but ((map ++) (cons 1 nil)) hasn't, we don't want to remember `map`.
 
-(: (reducex-application hsh exnames fnnames locals tamep expression)
+(define (reducex-application hsh exnames fnnames locals tamep expression)
 
   (if (and (symbol? (head expression)) (reducex-been-applied? fnnames (head expression) (cadr expression)))
 
@@ -558,10 +617,10 @@
           (robj (ensure-merge (rdeps rex) (rdeps nexrex)) (cons f (cons (rexp nexrex) nil))
             (rfnapps-merge (rfnapps rex) (rfnapps nexrex))))))))
 
-;(: baz (\ x (\ y ((baz y) y))))
+;(define baz (\ x (\ y ((baz y) y))))
 ;((baz y) y)
 
-(: (reducex hsh exnames fnnames locals tamep expression)
+(define (reducex hsh exnames fnnames locals tamep expression)
   (cond
 
     ((is-fn? expression)
@@ -583,20 +642,20 @@
           ((is-primop? expression) (robj nil expression nil))
           (else                    (error "Eek! Unbound variable: " expression)))))))
 
-(: (reduce-dependancies redhsh hsh deps)
+(define (reduce-dependancies redhsh hsh deps)
   (if (null? deps)
     redhsh
     (let ((fail (gensym)))
       (if (eq? (table-ref redhsh (head deps) fail) fail)
-	(let ((rex (reducex hsh nil nil nil false (head deps))))
-	  (table-set! redhsh (head deps) (rexp rex))
-	  (reduce-dependancies (reduce-dependancies redhsh hsh (rdeps rex)) hsh (tail deps)))
-	(reduce-dependancies redhsh hsh (tail deps))))))
+        (let ((rex (reducex hsh nil nil nil false (head deps))))
+          (table-set! redhsh (head deps) (rexp rex))
+          (reduce-dependancies (reduce-dependancies redhsh hsh (rdeps rex)) hsh (tail deps)))
+        (reduce-dependancies redhsh hsh (tail deps))))))
 
-(: (main-reduce codes)
+(define (main-reduce codes)
   (reduce-dependancies (make-table) (codes->hash codes) (cons main-sym nil)))
 
-(: (reduce-all codes)
+(define (reduce-all codes)
   (reduce-dependancies (make-table) (codes->hash codes) (map cadr codes)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -604,23 +663,23 @@
 ;;; Translate into imperative instruction form and slow sequences with faster ones.
 ;;; Takes a code hash as input and returns list of imperative code.
 
-(: (find-first p xs)
+(define (find-first p xs)
   (if (null? xs) #f (if (p (car xs)) (car xs) (find-first p (cdr xs)))))
 
 
-(: todofns '())
-(: todons  1)
+(define todofns '())
+(define todons  1)
 
-(: (todofns-mk id code closdp) (list id code closdp))
-(: (todofns-id x)     (car x))
-(: (todofns-code x)   (cadr x))
-(: (todofns-closdp x) (caddr x))
+(define (todofns-mk id code closdp) (list id code closdp))
+(define (todofns-id x)     (car x))
+(define (todofns-code x)   (cadr x))
+(define (todofns-closdp x) (caddr x))
 
 ;; (\ x (\ y y))
 ;; (\ a (\ b b))
 ;; x = a
 ;; y = b
-(: (todofns-same-code-? x y vars)
+(define (todofns-same-code-? x y vars)
   (cond
     ((is-fn? x)
       (if (is-fn? y)
@@ -633,11 +692,11 @@
     ((and (symbol? x) (symbol? y)) (eq? (assoc-ref-nfv vars x '()) y))
     (else #f)))
 
-(: (todofns-same-code? x y) (todofns-same-code-? x y '()))
+(define (todofns-same-code? x y) (todofns-same-code-? x y '()))
 
-(: (todofns-same-closdp? x y) (or (and x y) (not (or x y))))
+(define (todofns-same-closdp? x y) (or (and x y) (not (or x y))))
 
-(: (todofns-lookup code closdp)
+(define (todofns-lookup code closdp)
   (find-first
     (lambda (f)
       (and
@@ -645,7 +704,7 @@
         (todofns-same-closdp? (todofns-closdp f) closdp)))
     todofns))
 
-(: (todofns-register code closdp)
+(define (todofns-register code closdp)
   (let ((fn (todofns-lookup code closdp)))
     (if fn
       (todofns-id fn)
@@ -654,49 +713,50 @@
         (set! todons (+ todons 1))
         (- todons 1)))))
 
-(: todo-evvs '())
-(: todo-evns 0)
+(define todo-evvs '())
+(define todo-evns 0)
 
-(: (todo-evvs-mk id code closdp) (list id code closdp))
-(: (todo-evvs-id x)     (car x))
-(: (todo-evvs-code x)   (cadr x))
-(: (todo-evvs-closdp x) (caddr x))
+(define (todo-evvs-mk id code closdp) (list id code closdp))
+(define (todo-evvs-id x)     (car x))
+(define (todo-evvs-code x)   (cadr x))
+(define (todo-evvs-closdp x) (caddr x))
 
-(: cquote-sym (gensym))
-(: (is-cquote? s) (and (pair? s) (eq? (car s) cquote-sym)))
-(: (cquote x)   (cons cquote-sym x))
-(: (cquote-value x) (cdr x))
+(define cquote-sym (gensym))
+(define (is-cquote? s) (and (pair? s) (eq? (car s) cquote-sym)))
+(define (cquote x)   (cons cquote-sym x))
+(define (cquote-value x) (cdr x))
 
 ;; The only reason to not be eval ready is if we reference a local variable on stack.
 ;; if the leaf is a symbol and not a primop, then false.
-(: (is-evalready? v)
+(define (is-evalready? v)
   (cond
     ((or (is-fn? v) (is-cquote? v)) #f)
     ((list? v)  (every (lambda (x) (or (is-fn? x) (is-evalready? x))) v))
     (else       (or (not (symbol? v)) (is-primop? v)))))
 
-(: (replace-locals code locals)
+(define (replace-locals code locals)
   (let loop ((c code) (l locals) (y 0))
     (if (null? l) c
       (loop (replace-all c (car l) (list 'LOCAL y)) (cdr l) (+ y 1)))))
 
-(: (send-out-fns v closdp)
+(define c-lambda-sym (gensym))
+
+(define (send-out-fns v closdp)
   (if (is-fn? v)
-    (todofns-register v closdp)
-    (if (list? v)
+    (cquote (list 'LAMBDA (todofns-register v closdp)))
+    (if (and (list? v) (not (is-cquote? v)))
       (map (lambda (x) (send-out-fns x closdp)) v)
       v)))
 
-
 ; Some examples of using prevals within prevals.
 ;
-; (: main (run (>>= (getcc stdin) (putcc stdout))))
+; (define main (run (>>= (getcc stdin) (putcc stdout))))
 ;
 ; smooth_preval_3 = cgetc(stdin, ~4~);
 ; smooth_preval_2 = iocons_cdr(smooth_preval_3);
 ; smooth_preval_1 = cputc(stdout, iocons_car(smooth_preval_3), ~2~);
 ;
-; (: main (run (>>= getchar putchar)))
+; (define main (run (>>= getchar putchar)))
 ;
 ; smooth_preval_4 = cgetc(stdin, ~5~);
 ; smooth_preval_3 = iocons(ulint_to_numeral(iocons_car(smooth_preval_4)), iocons_cdr(smooth_preval_4));
@@ -719,7 +779,7 @@
 ;; This will allow us to replace eg. (numeral_to_ulint (\ ...)) with (cquote 44)
 ;; before the function gets sent onto the todo list.
 
-(: (numeral_to_ulint_opt v)
+(define (numeral_to_ulint_opt v)
   (if (and (is-fn? v) (is-fn? (caddr v)))
     (let ((f (cadr v)) (x (cadr (caddr v))))
       (let loop ((n 0) (c (caddr (caddr v))))
@@ -730,7 +790,7 @@
             #f))))
     #f))
 
-(: (primop-call-optimise v)
+(define (primop-call-optimise v)
 (display (car v))
 (newline)
   (if (eq? (car v) 'numeral_to_ulint)
@@ -740,16 +800,16 @@
         v))
     v))
 
-(: (docode v closdp)
+(define (docode v closdp)
   (cond
-    ((is-cquote? v) (list (list 'SMOOTH_CALL (cquote-value v))))
+    ((is-cquote? v) (list (list 'CALL (cquote-value v))))
     ((is-fn? v)
-      (list (list 'SMOOTH_PUSH (todofns-register v closdp))))
+      (list (list 'PUSH (list 'LAMBDA (todofns-register v closdp)))))
 
     ((and (list? v) (is-evalready? v))
       (set! todo-evvs (cons (todo-evvs-mk todo-evns (send-out-fns v closdp) closdp) todo-evvs))
       (set! todo-evns (+ todo-evns 1))
-      (list (list 'SMOOTH_PUSH (string-append "smooth_preval[" (number->string (- todo-evns 1)) "]"))))
+      (list (list 'PUSH (string-append "preval[" (number->string (- todo-evns 1)) "]"))))
 
     ;; If we reach here we have a function call, so we pop the arguments first.
     ((list? v)
@@ -759,50 +819,50 @@
           (primop-call-optimise v)
           (append
             (cond
-              ((is-cquote? (cadr v)) (list (list 'SMOOTH_PUSH (cquote-value (cadr v)))))
+              ((is-cquote? (cadr v)) (list (list 'PUSH (cquote-value (cadr v)))))
               ((and (not (is-fn? (cadr v))) (list? (cadr v)))
                 (docode (cadr v) closdp))
               ((is-primop? (cadr v))
-                (list (list 'SMOOTH_PUSH (primop-path (cadr v)))))
+                (list (list 'PUSH (primop-path (cadr v)))))
               ((is-fn? (cadr v))
-                (list (list 'SMOOTH_PUSH (todofns-register (cadr v) closdp))))
-              (else (list (list 'SMOOTH_PUSH (cadr v)))))
+                (list (list 'PUSH (list 'LAMBDA (todofns-register (cadr v) closdp)))))
+              (else (list (list 'PUSH (cadr v)))))
             (docode (head v) closdp)))))
     ((is-primop? v)
       (list (list (string-append "PRIMCALL_" (number->string (primop-arity v))) (primop-path v))))
-    (else (list (list 'SMOOTH_PUSH v)))))
+    (else (list (list 'PUSH v)))))
 
 ;; When we encounter a new variable that must be closed over,
 ;; we ensure first that we convert references to those expressions into
 ;; a call up the closure chain to get the right variable.
-(: (docode-lambda v closdp)
-  (let ((s (if closdp '((SMOOTH_SET SELF (SMOOTH_CLOSURE_CAST (SMOOTH_POP)))) '((SMOOTH_SPDEC)))))
-    (append s '((SMOOTH_SET LOCAL (SMOOTH_POP)))
+(define (docode-lambda v closdp)
+  (let ((s (if closdp '((SET SELF (CLOSURE_CAST (POP)))) '((SPDEC)))))
+    (append s '((SET LOCAL (POP)))
       (if (is-fn? v)
-        `((SMOOTH_PUSH
-          (SMOOTH_CLOSURE_CREATE ,(todofns-register v true) LOCAL ,(if closdp 'SELF 'NULL))))
-	(docode v true)))))
+        `((PUSH
+          (CLOSURE_CREATE (LAMBDA ,(todofns-register v true)) LOCAL ,(if closdp 'SELF 'NULL))))
+        (docode v true)))))
 
-(: (exdepth x) (cond ((is-fn? x) 0) ((list? x) (+ (max (exdepth (cadr x)) (- (exdepth (car x)) 1)) 1)) (else 0)))
+(define (exdepth x) (cond ((is-fn? x) 0) ((list? x) (+ (max (exdepth (cadr x)) (- (exdepth (car x)) 1)) 1)) (else 0)))
 
-(: (clos-lookup n)
+(define (clos-lookup n)
   (cquote
     (if (= n 0)
       'LOCAL
-      `(SMOOTH__CLOSURE_LOCAL ,(listndeep 'SMOOTH__CLOSURE_PARENT 'SELF (- n 1))))))
+      `(CLOSURE_LOCAL ,(listndeep 'CLOSURE_PARENT 'SELF (- n 1))))))
 
-(: (depth-align-varn expression vname n)
+(define (depth-align-varn expression vname n)
   (cond
     ((is-fn? expression)
       (list (car expression) (cadr expression)
-	    (depth-align-varn (caddr expression) vname (+ n 1))))
+            (depth-align-varn (caddr expression) vname (+ n 1))))
     ((list? expression) (map (lambda (x) (depth-align-varn x vname n)) expression))
     ((eq? expression vname) (clos-lookup n))
     (else expression)))
 
-(: (depth-align-var expression vname) (depth-align-varn expression vname 0))
+(define (depth-align-var expression vname) (depth-align-varn expression vname 0))
 
-(: (lambda-depths tc)
+(define (lambda-depths tc)
   (let ((tab (make-table)) (l (length tc)))
     (map (lambda (x) (table-set! tab (car x) (number->string (cadr x)))) tc)
     (let loop ((i 0) (accs '()))
@@ -816,16 +876,16 @@
 ;  (numeral_to_ulint 8))
 ;  9)
 
-(: (re-aritise-head-depth e) (if (list? e) (+ (re-aritise-head-depth (car e)) 1) 0))
-(: (re-aritise-head-arity e) (if (list? e) (re-aritise-head-arity (car e)) (primop-arity e)))
+(define (re-aritise-head-depth e) (if (list? e) (+ (re-aritise-head-depth (car e)) 1) 0))
+(define (re-aritise-head-arity e) (if (list? e) (re-aritise-head-arity (car e)) (primop-arity e)))
 
-(: (re-aritise-flatten x)
+(define (re-aritise-flatten x)
   (if (list? (car x))
     (append (re-aritise-flatten (car x)) (list (re-aritise (cadr x))))
     (list (car x) (re-aritise (cadr x)))))
 
-(: (re-aritise e)
-  (if (list? e)
+(define (re-aritise e)
+  (if (and (list? e) (not (is-cquote? e)))
     (append
       (if (list? (car e))
         (if (< (re-aritise-head-depth (car e)) (re-aritise-head-arity (car e)))
@@ -835,27 +895,27 @@
       (list (re-aritise (cadr e))))
     e))
 
-(: (prim-full-paths c)
-  (if (list? c) (map prim-full-paths c)
+(define (prim-full-paths c)
+  (if (and (list? c) (not (is-cquote? c))) (map prim-full-paths c)
     (if (symbol? c) (primop-path c) c)))
 
-(: (do-evv e)
-  `(SMOOTH_SET ,(string-append "smooth_preval[" (number->string (todo-evvs-id e)) "]")
+(define (do-evv e)
+  `(SET ,(string-append "preval[" (number->string (todo-evvs-id e)) "]")
      ,(tocstr (todo-evvs-code (prim-full-paths (re-aritise e))))))
 
-(: (docode-reroll c)
+(define (docode-reroll c)
   (if (or (null? c) (null? (cdr c))) c
     (let loop ((n 1) (nex (car c)) (rem (cdr c)))
         (if (null? rem)
-          (if (= n 1) (list nex) (list (list 'SMOOTH_REPEAT nex n)))
+          (if (= n 1) (list nex) (list (list 'REPEAT nex n)))
           (if (equal? (car rem) nex)
             (loop (+ n 1) nex (cdr rem))
             (cons
-              (if (= n 1) nex (list 'SMOOTH_REPEAT nex n))
+              (if (= n 1) nex (list 'REPEAT nex n))
               (loop 1 (car rem) (cdr rem))))))))
 
 
-(: (docode-complete v)
+(define (docode-complete v)
   (let ((dc (docode-reroll (docode v false))))
     (let loop ((ac (list (cons 0 (cons (exdepth v) dc)))))
       (if (null? todofns)
@@ -878,14 +938,14 @@
                       (todofns-closdp nex)))))
               ac)))))))
 
-(: (optimize-equivalents tb)
+(define (optimize-equivalents tb)
   (docode-complete (table-ref tb main-sym)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Generate phase - simply take the imperative instruction list and print as C.
 
-(: (tocstr x)
+(define (tocstr x)
   (cond
     ((is-cquote? x) (tocstr (cquote-value x)))
     ((string? x) x)
@@ -893,15 +953,15 @@
     ((number? x) (number->string x))
     ((list? x)   (string-append (tocstr (head x)) "(" (implode ", " (map tocstr (tail x))) ")"))))
 
-(: (instructions-string c i)
+(define (instructions-string c i)
   (implode "" (map (lambda (x) (string-append (if i "      " "  ") (tocstr x) ";\n")) c)))
 
 ;; This should take the imperative code format and simply print it out as C.
-(: (generate-c tbc)
+(define (generate-c tbc)
   (let ((tc (cdr tbc)) (td (caar tbc)) (tv (cadar tbc)))
 
     (string-append "
-#include \"smoothlang/anc2020/_smooth.h\"
+#include \"smoothlang/anc2020/smooth_core.h\"
 
 "
 (apply string-append
@@ -912,19 +972,30 @@
         ";\n"))
     (table->list primops)))
 "
-static smooth_t smooth_preval[" (number->string td) "];
+static smooth_t preval[" (number->string td) "];
 
-void smooth_execute (void) {
+/* Allocate some memory which we can shadow to use as ID addresses for our lambda tags. */
+#define SMOOTH_LAMBDAS_LENGTH 1
+unsigned long int smooth_lambdas_length = SMOOTH_LAMBDAS_LENGTH;
+byte smooth_lambdas_start[SMOOTH_LAMBDAS_LENGTH];
+
+#if 0
+/* Not sure if it is good to change to this definition, but something worth considering. */
+void smooth_execute (smooth_t pc, smooth_closure_t* self, smooth_t local) {
+  unsigned long int i;
+#else
+void smooth_execute (smooth_t pc) {
   unsigned long int i;
   smooth_closure_t* self;
   smooth_t local;
+#endif
 "
 (if (> (length (cdr tc)) 1)
 (string-append "
 #if 0
 jump:
 #endif
-  switch (smooth_pc) {
+  switch (pc) {
 "
 (implode ""
   (map
@@ -943,9 +1014,7 @@ int main (const int argc, const char** const argv) {
   smooth_argc = (smooth_t) argc;
   smooth_argv = (smooth_t) argv;
 
-#ifndef SMOOTH_FIXED_STACK
-  smooth_stack = smooth__linked_array_allocate(SMOOTH_STACK_SIZE);
-#endif
+  CORE_INIT();
 
 "
 (instructions-string (append tv (cddr (car tc))) false)
@@ -960,12 +1029,12 @@ int main (const int argc, const char** const argv) {
 ;;; Module structure
 
 ;; All deps file must use forward slash on both Unix and Windows.
-(: the-slash "/")
+(define the-slash "/")
 
 ;; Currently only Unix :)
-(: system-slash "/")
+(define system-slash "/")
 
-(: (end-with-slash s)
+(define (end-with-slash s)
   (let ((sl (string-length s)))
     (if (= sl 0)
       system-slash
@@ -974,70 +1043,70 @@ int main (const int argc, const char** const argv) {
         (string-append s system-slash)))))
 
 ;; Currently only supports one path.
-(: (get-lib-paths) (map end-with-slash (list (getenv "SMOOTH_PATH"))))
+(define (get-lib-paths) (map end-with-slash (list (getenv "SMOOTH_PATH"))))
 
-(: (code-path-exists filepart libpath)
+(define (code-path-exists filepart libpath)
   (open-input-file (string-append libpath filepart filext)))
 
 ;; smooth-lang/anc2020/mybar
 ;; "/smooth-lang/anc2020/my bar" (foo)
 ;;
 ;; Currently only supports the first format
-(: (compile-dep s)
+(define (compile-dep s)
   (let ((filepart (string-replace s the-slash system-slash)))
     (find-first (partial code-path-exists filepart) (get-lib-paths))))
 
 ;; Queries the server and downloads any updated files.
-(: (smosync-all) false)
-(: (smosync-file file recursivep forcep) false)
+(define (smosync-all) false)
+(define (smosync-file file recursivep forcep) false)
 
 ;; file has format "smooth-lang/anc2020/list"
 ;; If it is recursive, it will also download the dependancies for list
 ;; but it will only overwrite existing dependancy files if we use forcep.
-(: (smoinstall file recursivep forcep) false)
+(define (smoinstall file recursivep forcep) false)
 
-(: (smooth-path-to-codefile x) (string-append "~/code/smooth/" x ".smo"))
-(: (smooth-path-to-libfile  x) (string-append "~/code/smooth/" x ".slo"))
+(define (smooth-path-to-codefile x) (string-append "~/code/smooth/" x ".smo"))
+(define (smooth-path-to-libfile  x) (string-append "~/code/smooth/" x ".slo"))
 
-(: (code-header c)
+(define (code-header c)
   (if (null? c) nil
     (if (or (is-begin? (head c)) (is-def? (head c))) nil
       (cons (head c) (code-header (tail c))))))
 
-(: (code-forms c)
+(define (code-forms c)
   (if (null? c) nil
     (if (or (is-begin? (head c)) (is-def? (head c))) c
       (code-forms (tail c)))))
 
-(: (has-main-sym? c) (not (eq? (table-ref (codes->hash c) main-sym false) false)))
+(define (has-main-sym? c) (not (eq? (table-ref (codes->hash c) main-sym false) false)))
 
-(: (the-imports  h) nil)
+(define (the-imports  h) nil)
 
-(: (the-includes h)
+(define (the-includes h)
   (if (null? h) nil
     (if (eq? (caar h) 'include)
       (cons (car h) (the-includes (cdr h)))
       (the-includes (cdr h)))))
 
-(: (the-primops  h) (map cdr (the-includes h)))
+(define (the-primops  h) (map cdr (the-includes h)))
 
-(: (add-codez x rv)
+(define (add-codez x rv)
   (read-all (smooth-path-to-libfile x)))
 
-(: (compile-executable h c)
+(define (compile-executable h c)
   (map compile-entry (the-imports h))
   ;;now include the libraries codes.
   (let ((c (foldr add-codez c (the-imports h))))
     (let* ((p2t (main-reduce (expand-statements nil c))))
       (generate-c (optimize-equivalents p2t)))))
 
-(: (compile-library h c)
+(define (compile-library h c)
   (map compile-entry (the-imports h))
   (table->list (reduce-all (expand-statements nil c))))
 
-(: (primop-path-to-c p) (string-replace p "/" "_"))
+(define (primop-path-to-c p) (string-replace p "/" "_"))
 
-(: (add-primops! h)
+(define (add-primops! h)
   (map
     (lambda (x)
       (map
@@ -1050,7 +1119,8 @@ int main (const int argc, const char** const argv) {
         (cdr x)))
     (the-primops h)))
 
-(: (compile-entry x)
+#|
+(define (compile-entry x)
   (let* ((a (read-all (smooth-path-to-codefile x)))
          (h (code-header a)))
     ;; Add the primops.
@@ -1063,6 +1133,19 @@ int main (const int argc, const char** const argv) {
               (lf (open-output-file (smooth-path-to-libfile x))))
           (display l lf)
           (close-output-port lf))))))
+|#
+
+;; First compile the module, so that it has outputted a public only file format.
+;; This file may refer to linkages declared earlier, these symbols will have a different token value.
+;; The file will have no import statements
+
+(define (compile-entry x)
+  (let* ((path (smooth-path-to-codefile x))
+         (ip (open-input-file path))
+         (r (read ip)))
+    (if (eof-object? r)
+      (close-input-port ip)
+      r)))
 
 (if (null? (tail (command-line))) false (compile-entry (cadr (command-line))))
 

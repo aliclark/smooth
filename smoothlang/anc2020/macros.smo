@@ -1,0 +1,47 @@
+
+(import smoothlang/anc2020/tsymbol)
+(import smoothlang/anc2020/io     prefixing 'io.')
+(import smoothlang/anc2020/bool   prefixing 'bool.')
+(import smoothlang/anc2020/char   prefixing 'char.')
+  (import smoothlang/anc2020/tlist  prefixing 'tl.')
+(import smoothlang/anc2020/list   prefixing 'list.')
+(import smoothlang/anc2020/number prefixing 'num.')
+
+;; tlist and tsymbol are like the basic objects, but addtionally with
+;; islist and issymbol predicates
+;;
+;; args is a tlist or parameters, which are themselves either tlist or tsymbol
+
+;; Question: can we hygeinically match all symbols to their modules?
+;;
+;; What I want to do is first run the macro, then inspect the output
+;; and match up the symbols to their definitions.
+
+(defmacro (let args)
+  (io.return `((lambda ,(tl.first args) ,(tl.third args)) ,(tl.second args))))
+
+(defmacro (awhen args)
+  (io.return
+    `(let it ,(tl.first args)
+      (bool.if it (io.do ,@(tl.tail args)) (io.return io.unit)))))
+
+(defmacro (square args)
+  (io.>>= io.gensym
+    (lambda gv (io.return `(let ,gv ,(tl.first args) (num.* ,gv ,gv))))))
+
+(defmacro (list args)
+  (io.return
+    (bool.if (tl.null args) 'list.nil'
+      (tl.cons 'list.cons'
+        (tl.cons (tl.head args)
+          (tl.cons
+            (tl.cons 'list' (tl.cons (tl.tail args) tl.nil)) tl.nil))))))
+
+(define set1 (list 1 2 3 4 5))
+
+(defreader #\'
+  (io.>>= io.read (lambda item (io.return (tl.list 'list' item)))))
+
+
+
+
