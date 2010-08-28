@@ -1,24 +1,26 @@
 
-This is an early release. It is not intended for writing serious programs yet!
-
-Group discussion:
+Discussion group (or please contact me directly on Github):
 
 http://groups.google.com/group/smoothlang
 
 
-Install instructions:
+Notes:
 
-(Note, this is for *nix based systems, and may need more work to get running on Windows)
+The code is written for Gambit Scheme and Linux, but should not take much to port to
+other Schemes and Windows.
 
-1) Install gcc
+The code at the moment is not complete and needs more work to be able to run full programs,
+but is put online for those interested.
 
-2) Install Gambit Scheme. Often packaged as 'gambc' on Linux
-   www.iro.umontreal.ca/~gambit/
+This project is not vaporware - there will be a release, but neither am I in a rush,
+so things are being written such that major rewrites should not be necessary.
 
-3) Move the file "dot-gambcini" to ~/.gambcini
+The compiler itself will be up to the scratch of generating a decent executable pretty soon, ie. O(months),
+but it will take a while longer before the rest of the environment
+(packages, macros, read table, module code optimisations etc.)
+is up to scratch for writing code in the language.
 
-4) Edit src/compiler.scm and search for ~/code/smooth
-   Replace ~/code/smooth with the location where you have installed the code
-
-5) cd into the base of your Smooth directory and run `./scc smoothlang/anc2020/test`
-   This should hopefully result in an executable called "test" being created in that directory.
+If you are interested in the project, please don't start hacking on it just yet,
+as I've got a number of things that are yet to be changed or implemented,
+and would not want to reject a good submission because it clashed with something else.
+Instead please give me a message and let me know if there's something you want to hack on.

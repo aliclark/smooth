@@ -277,6 +277,7 @@
 (define internal-prevals   (make-table))
 (define internal-lambdas   (make-table))
 (define internal-closure-n (make-table))
+(define internal-arity-n   (make-table))
 (define internal-primops   (make-table))
 
 (define (lamref-lookup x) (table-ref  internal-lambdas (lamref-id x)))
@@ -389,11 +390,25 @@
 
 (define (send-out-lambda p)
   (let ((rv (send-out-lambdas- (lambda-expression-body p))))
-    (table-set! internal-lambdas   internal-lambdas-id (car rv))
-    (table-set! internal-closure-n internal-lambdas-id (dec (cdr rv)))
 
-    (set! internal-lambdas-id (+ internal-lambdas-id 1))
-    (cons (lamref-mk (- internal-lambdas-id 1)) (dec (cdr rv)))))
+    ;; We need to do checking here to see if rv is a lambdid
+    ;; if it is then we want to take return its lambdid, but w
+    (if (lamref? (car rv))
+
+      (let ((lid (lamref-id (car rv))))
+        (table-set! internal-closure-n lid (dec (cadr rv)))
+        (table-set! internal-arity-n   lid (inc (caddr rv)))
+        (list (car rv) (dec (cadr rv)) (inc (caddr rv ))))
+
+      (begin
+
+        (table-set! internal-lambdas   internal-lambdas-id (car rv))
+        (table-set! internal-closure-n internal-lambdas-id (dec (cadr rv)))
+        (table-set! internal-arity-n   internal-lambdas-id (inc (caddr rv)))
+
+        (set! internal-lambdas-id (+ internal-lambdas-id 1))
+
+        (list (lamref-mk (- internal-lambdas-id 1)) (dec (cadr rv)) (inc (caddr rv )))))))
 
 ;; (lambda x (do_shizzle1 (lambda y (do_shizzle2 global_c_var))))
 ;;
@@ -405,12 +420,12 @@
   (cond
     ((lambda-expression? p)
       (let ((lamdid (send-out-lambda p)))
-        (cons (car lamdid) (cdr lamdid))))
+        (list (car lamdid) (cadr lamdid) (caddr lamdid))))
     ((non-resvd-list? p)
       (let ((l (p-map send-out-lambdas- p)))
-        (cons (p-map car l) (max-list (p-map cdr l)))))
-    ((varref? p) (cons p (inc (varref-val p))))
-    (else (cons p 0))))
+        (list (p-map car l) (max-list (p-map cadr l)) 0)))
+    ((varref? p) (list p (inc (varref-val p)) 0))
+    (else (list p 0 0))))
 
 (define (send-out-lambdas p) (car (send-out-lambdas- p)))
 
@@ -647,6 +662,10 @@
 (define (generate-prevals-code)
   (implode "\n" (map preval-to-code (reverse (table->list internal-prevals)))))
 
+;; A bit hacky here, use reverse and hope that's the right order instead of sorting it...
+(define (generate-arity-values)
+  (implode ", " (map (lambda (x) (number->string (cdr x))) (reverse (table->list internal-arity-n)))))
+
 (define (generate-internal)
   (if (= internal-prevals-id 0)
     "
@@ -672,8 +691,13 @@ static smooth preval[" (number->string internal-prevals-id) "];
 
 /* Allocate some memory which we can shadow to use as ID addresses for our lambda tags. */
 #define SMOOTH_LAMBDAS_LENGTH " (number->string internal-lambdas-id) "
-const unsigned long int smooth_lambdas_length = SMOOTH_LAMBDAS_LENGTH;
-static const byte smooth_lambdas_start[SMOOTH_LAMBDAS_LENGTH];
+
+const smooth_size smooth_lambdas_length = SMOOTH_LAMBDAS_LENGTH;
+
+static const smooth_size smooth_lambda_sizes[SMOOTH_LAMBDAS_LENGTH] = {
+  " (generate-arity-values) "
+};
+
 
 static smooth apply_single (smooth f, smooth v) {
   return APPLY(f, &v, 1);
@@ -684,7 +708,7 @@ static smooth closure_single (smooth lam, smooth local) {
 }
 
 #ifdef NATIVE_STACK
-smooth smooth_execute (smooth pc, smooth self, smooth local) {
+smooth smooth_execute (smooth pc, smooth self, smooth* locals, smooth_size numlocals) {
 #else
 void smooth_execute (smooth pc) {
 #endif
@@ -692,18 +716,26 @@ void smooth_execute (smooth pc) {
 #ifndef NATIVE_STACK
   /* we need to to extract the args from args and put them onto our own stack. */
   smooth self;
-  smooth local;
-  int i;
+  smooth local[MAX_NUM_LOCALS];
+  smooth_size numlocals
 #endif
-  /* TODO: This will be used to hold function body working locals */
+  int i;
+  /*
+   * TODO: This will be used to hold function body working locals.
+   * It will have enough space for the max number of tmp's used
+   * by any one lambda
+   */
   smooth tmp[1];
 
 #ifndef NATIVE_STACK
 push_jump:
-  self  = POP();
-  local = POP();
-  i     = POP();
-  tmp   = POP();
+
+  /* TODO: change code so these are accessed directly on stack */
+  self      = POP();
+  numlocals = POP();
+  locals    = POP();
+  i         = POP();
+  tmp       = POP();
 #endif
 
 jump:
@@ -721,7 +753,7 @@ int main (int argc, char** argv) {
   smooth_argc = argc;
   smooth_argv = argv;
 
-  CORE_INIT(smooth_lambdas_start);
+  CORE_INIT(smooth_lambda_sizes);
 
 "
 (generate-prevals-code)

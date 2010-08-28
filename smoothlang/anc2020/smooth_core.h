@@ -16,7 +16,7 @@
 #define SET(a, b)       a = b
 #define REPEAT(c, n)    for (i = (n); i > 0; --i) { c; }
 
-#define VARIABLE_LOOKUP(n) ((n) == 0 ? local : CLOSURE_LOOKUP(self, (n) - 1))
+#define VARIABLE_LOOKUP(n) ((n) < numlocals ? locals[n] : CLOSURE_LOOKUP(self, (n) - numlocals))
 
 #define LAMBDA(x)   smooth_lambda(x)
 #define UNLAMBDA(x) smooth_unlambda(x)
@@ -83,7 +83,7 @@ extern "C" {
   void smooth_stack_push (smooth x);
   smooth smooth_stack_pop (void);
 
-  void smooth_core_init (const byte* lambdas_start);
+  void smooth_core_init (const smooth_size* lambda_sizes);
 
 #  ifdef __cplusplus
 }

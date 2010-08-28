@@ -628,7 +628,7 @@ static void growable_table_free (growable_table* gt) {
 /*---------------------------------------------------------------------------*/
 /***************************** LAMBDA TYPE ***********************************/
 
-static const byte* lambdas_start;
+static const smooth_size* lambda_sizes;
 
 
 /*
@@ -654,14 +654,14 @@ static const byte* lambdas_start;
 static
 #endif
 smooth smooth_lambda (smooth x) {
-  return (smooth) (x + lambdas_start);
+  return (smooth) (x + lambda_sizes);
 }
 
 #ifdef RTS_STATIC
 static
 #endif
 smooth smooth_unlambda (smooth x) {
-  return (smooth) (((byte*) x) - lambdas_start);
+  return (smooth) (((smooth_size*) x) - lambda_sizes);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -1159,7 +1159,7 @@ static void closure_body_copy (closure* x) {
 /*---------------------------------------------------------------------------*/
 /***************************** FUNCTION TYPE *********************************/
 
-extern size_t smooth_lambdas_length;
+extern smooth_size smooth_lambdas_length;
 
 /*
 When you use SMOOTH_*_P, exactly one of the predicates will be true, no matter what you pass.
@@ -1167,8 +1167,8 @@ In other words, don't use SMOOTH_*_P unless you know you have some kind of funct
 */
 
 static bool is_lambda (smooth x) {
-  return ((((byte*) x) >= lambdas_start) &&
-          (((byte*) x) < (lambdas_start + smooth_lambdas_length)));
+  return ((((smooth_size*) x) >= lambda_sizes) &&
+          (((smooth_size*) x) < (lambda_sizes + smooth_lambdas_length)));
 }
 
 /*---------------------------------------------------------------------------*/
@@ -1189,7 +1189,7 @@ static bool is_lambda (smooth x) {
 
 #ifdef NATIVE_STACK
 
-smooth smooth_execute (smooth pc, smooth self, smooth local);
+smooth smooth_execute (smooth pc, smooth self, smooth* locals, smooth_size numlocals);
 
 #else
 
@@ -1265,6 +1265,9 @@ smooth smooth_apply (smooth x, smooth* args, smooth_size n) {
 
   smooth code;
   smooth rv;
+#ifndef NATVIE_STACK
+  smooth j;
+#endif
 
 /* If doing tail call on NATIVE_STACK, we jump here to save frame space */
 jump:
@@ -1298,15 +1301,27 @@ jump:
       xc = nex;
     }
 
+/*
+
+(lambda (x1...x50)
+  x4
+)
+
+ */
+
     /* if there are still args for consumption, they get applied to the code. */
     if (i != n) {
 
       code = xc->code;
       if (is_lambda(code)) {
 #ifdef NATIVE_STACK
-        rv = smooth_execute(UNLAMBDA(code), (smooth) xc, args[i]);
+        return smooth_execute(UNLAMBDA(code), (smooth) xc, args, n);
 #else
-        PUSH(args[i]);
+        for (j = n - 1; j >= i; --j) {
+          PUSH(args[j]);
+        }
+        PUSH(n - i);
+
         PUSH(xc);
         smooth_execute(UNLAMBDA(code));
         rv = POP();
@@ -1315,16 +1330,16 @@ jump:
         call_register_add_frame();
         rv = ((smooth (*)(smooth, smooth)) code)((smooth) xc, args[i]);
         call_register_check_frame(rv);
-      }
 
-      if ((n - i) == 1) {
-        return rv;
-      }
+        if ((n - i) == 1) {
+          return rv;
+        }
 
-      x = rv;
-      args += (i + 1);
-      n    -= (i + 1);
-      goto jump;
+        x = rv;
+        args += (i + 1);
+        n    -= (i + 1);
+        goto jump;
+      }
 
     } else {
       /* args ran out */
@@ -1332,28 +1347,37 @@ jump:
     }
 
   } else if (is_lambda(x)) {
+
+    // if we're not quite there, we create a closure instead.
+    if (n < (*((smooth_size*) x))) {
+      return smooth_closure_create(x, *((smooth_size*) x), args, n, NULL);
+    }
+
 #ifdef NATIVE_STACK
-    rv = smooth_execute(UNLAMBDA(x), (smooth) NULL, args[0]);
+    return smooth_execute(UNLAMBDA(x), (smooth) NULL, args, n);
 #else
-    PUSH(args[0]);
+    for (i = n - 1; i >= 0; --i) {
+      PUSH(args[i]);
+    }
+    PUSH(n);
     PUSH(NULL);
     smooth_execute(UNLAMBDA(x));
-    rv = POP();
+    return POP();
 #endif
   } else {
     call_register_add_frame();
     rv = ((smooth (*)(smooth)) x)(args[0]);
     call_register_check_frame(rv);
-  }
 
-  if (n == 1) {
-    return rv;
-  }
+    if (n == 1) {
+        return rv;
+    }
 
-  x = rv;
-  ++args;
-  --n;
-  goto jump;
+    x = rv;
+    ++args;
+    --n;
+    goto jump;
+  }
 
 }
 #ifdef RTS_STATIC
@@ -1368,8 +1392,8 @@ smooth smooth_apply (smooth x, smooth* args, smooth_size n) {
 #ifdef RTS_STATIC
 static
 #endif
-void smooth_core_init (const byte* ls) {
-  lambdas_start = ls;
+void smooth_core_init (const smooth_size* ls) {
+  lambda_sizes = ls;
 
 #ifndef NATIVE_STACK
   stack_allocate();
