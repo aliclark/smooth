@@ -17,30 +17,24 @@
 
 #include "smoothlang/anc2020/smooth.h"
 
-#define NULL 0
-
-static smooth_t numeral_addone (smooth_t x) {
+static smooth numeral_addone (smooth x) {
   return x + 1;
 }
 
-static smooth_t numeral_numeral_x (smooth_closure_t* self, smooth_t local) {
-  smooth_t depth = SMOOTH_C_LOCAL(SMOOTH_C_PARENT(self));
-  smooth_t f     = SMOOTH_C_LOCAL(self);
+static smooth numeral_inner (smooth self, smooth local) {
+  smooth f     = smooth_closure_lookup(self, 0);
+  smooth depth = smooth_closure_lookup(self, 1);
 
   /* Since we defined `addone` ourselves, we know it just adds 1, `depth` times */
-  if (f == ((smooth_t) numeral_addone)) {
+  if (f == ((smooth) numeral_addone)) {
     return depth + local;
   }
 
-  /* This is here as a formal requirement, but there is no need to ever reach this point. */
+  /* This is here as a formal requirement, but there is no need to ever reach this section. */
   for (; depth > 0; --depth) {
-    local = SMOOTH_APPLY(f, local);
+    local = smooth_apply(f, &local, 1);
   }
   return local;
-}
-
-static smooth_t numeral_numeral_f (smooth_closure_t* self, smooth_t local) {
-  return SMOOTH_C_CREATE(numeral_numeral_x, local, self);
 }
 
 /* This is our optimisation function (lambda -> C-code | null) */
@@ -49,10 +43,12 @@ static smooth_t numeral_numeral_f (smooth_closure_t* self, smooth_t local) {
 (: (smoothlang_anc2020_numeral__numeral_to_ulint x) (cquote 0))
 
 */
-smooth_t smoothlang_anc2020_numeral__numeral_to_ulint (smooth_t x) {
-  return SMOOTH_APPLY(SMOOTH_APPLY(x, numeral_addone), 0);
+smooth smoothlang_anc2020_numeral__numeral_to_ulint (smooth x) {
+  smooth args[] = { numeral_addone, 0 };
+  return smooth_apply(x, args, 2);
 }
 
-smooth_t smoothlang_anc2020_numeral__ulint_to_numeral (smooth_t a) {
-  return SMOOTH_C_CREATE(numeral_numeral_f, a, NULL);
+smooth smoothlang_anc2020_numeral__ulint_to_numeral (smooth a) {
+  return smooth_closure_create((smooth) numeral_inner, 2, &a, 1, NULL);
 }
+

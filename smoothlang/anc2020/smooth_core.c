@@ -1,6 +1,102 @@
 
+#ifndef __restrict__
+#  if __STDC_VERSION__ >= 199901L
+#    define __restrict__ restrict
+#  else
+#    define __restrict__ /*restrict*/
+#  endif
+#endif
 
 /*
+ * Whilst all memory is growable on demand, the start size can be changed to suit the application.
+ *
+ * All sizes _must_ be specified as a power of two and greater than 0.
+ * Also, these are no. of items, so its more like 16 bytes per closure and
+ * 4 bytes each for stack element and gc table entry
+ *
+ * Default settings of 1 item per structure are only reasonable for applications
+ * which want to be able to use a very tiny amount of bss where possible.
+ * Most applications do not care about that and should increase these values to
+ * probably at least 1024,1024,1024,16
+ *
+ * These are manifests rather than constants so they can be defined on command line easily.
+ */
+#ifndef STACK_SIZE
+#  define STACK_SIZE 1024
+#endif
+#ifndef CLOSURES_FREELIST_SIZE
+#  define CLOSURES_FREELIST_SIZE 32
+#endif
+#ifndef CLOSURES_SIZE
+#  define CLOSURES_SIZE 1024
+#endif
+#ifndef CLOSURES_BODY_FREELIST_SIZE
+#  define CLOSURES_BODY_FREELIST_SIZE 32
+#endif
+#ifndef CLOSURES_BODY_SIZE
+#  define CLOSURES_BODY_SIZE 1024
+#endif
+#ifndef GC_TABLE_SIZE
+#  define GC_TABLE_SIZE 1024
+#endif
+#ifndef CALL_REGISTER_SIZE
+#  define CALL_REGISTER_SIZE 512
+#endif
+
+/*
+ * Each memory area should have an option to comile statically so that it doesn't grow dynamically at run time.
+ * This will allow code to run closer to the metal, but at the risk of safety.
+ */
+
+#ifdef STACK_STATIC
+  #ifdef STACK_NO_BOUNDS_CHECK
+  #endif
+#endif
+#ifdef CLOSURES_FREELIST_STATIC
+  #ifdef CLOSURES_FREELIST_NO_BOUNDS_CHECK
+  #endif
+#endif
+#ifdef CLOSURES_STATIC
+  #ifdef CLOSURES_NO_BOUNDS_CHECK
+  #endif
+#endif
+#ifndef GC_TABLE_STATIC
+  #ifdef GC_TABLE_NO_BOUNDS_CHECK
+  #endif
+#endif
+#ifdef CALL_REGISTER_STATIC
+  #ifdef CALL_REGISTER_NO_BOUNDS_CHECK
+  #endif
+#endif
+
+/*
+ * If using RTS_STATIC, the compiler implementation does not need to
+ * preserve an ABI between the generated C code and the RTS -
+ * it may provide RTS definitions as macros which are burnt into the program code at compile time.
+ * This allows the code to run closer to the metal,
+ * but at the expense of the ability to switch out run time engine after the app has been compiled
+ */
+
+#ifdef RTS_STATIC
+#endif
+
+/*
+ * The native stack may be used entirely instead of the homemade smooth stack for normal function calls
+ * (note that tail calls will still be optimised)
+ *
+ * This will be preferable in the case where you would otherwise have defined a STACK_SIZE
+ * much smaller than the native stack.
+ *
+ * Of course, the native stack will not have quite as much space for calls in your own code
+ * because the run time itself will need to use it for calling primitives
+ * and they will need to use it for calling smooth_apply, which may add up.
+ *
+ * In other words, Know What You Are Doing when setting this option.
+ */
+#ifdef NATIVE_STACK
+#endif
+
+/* OLD NOTES ON IMPLEMENTATION. NOTE THAT THREADING IS NO LONGER BEING CONSIDERED.
 
 Falling through the cracks?
 The current ideology is that we will keep watch on all the interfaces to maintain count.
@@ -53,6 +149,7 @@ for arg in [a, b, c]:
 
 
 
+
 So the above seems to have irreconcilable problems.
 But would it be possible to have per-thread counting instead then?
 So instead of having a universal follow count,
@@ -62,8 +159,8 @@ Simpler yet, since we know only one call is happening at a time on the thread,
 we just have one flag saying whether or not the rv of the current call is to be followed.
 
 
-smooth_t c_func (smooth_t a) {
-  smooth_t b = create_closure(...);
+smooth c_func (smooth a) {
+  smooth b = create_closure(...);
   return a; // b is lost in the abyss
 }
 
@@ -73,8 +170,8 @@ smooth_t c_func (smooth_t a) {
 
 
 //per thread variables
-smooth_t *call_closure_creations;  // a mallocd array of all closures made in the most recent call.
-smooth_t *call_register_creations; // likewise for any addresses which were registered to gc.
+smooth *call_closure_creations;  // a mallocd array of all closures made in the most recent call.
+smooth *call_register_creations; // likewise for any addresses which were registered to gc.
 
 If is probably possible to just implement closure_create, by calling gc_register with the closure.
 This would greatly simplify stuff so I'd like to do that.
@@ -94,36 +191,34 @@ PER THREAD (each thread will read a different value accessing these - one per th
 It may be even more complicated - we may need to use a stack of expected addresses,
 since a call may be made from within another call.
 
-
  */
+
+#include <stdlib.h> /* size_t, EXIT_FAILURE, NULL, exit, malloc, realloc, free */
+#include <stdio.h> /* perror */
 
 #include "smoothlang/anc2020/smooth_core.h"
 
-#include "pthread.h"
-#include "stdlib.h"
-#include "stdio.h"
-
-#define TRUE  1
-#define FALSE 0
-
-extern void smooth_execute (smooth_t pc);
-
-extern byte*  smooth_lambdas_start;
-extern size_t smooth_lambdas_length;
+#ifdef __cplusplus
+#  define TRUE  true
+#  define FALSE false
+#else
+#  define TRUE  1
+#  define FALSE 0
+typedef byte bool;
+#endif
 
 /*---------------------------------------------------------------------------*/
 
-smooth_t smooth_argc;
-smooth_t smooth_argv;
-
-/*---------------------------------------------------------------------------*/
-
-static void call_lambda    (smooth_t x);
-static void call_closure   (smooth_t x);
-static void call_primitive (smooth_t x);
+int smooth_argc;
+char** smooth_argv;
 
 /*---------------------------------------------------------------------------*/
 /************************** MEMORY ALLOCATION ********************************/
+
+static void die_message (const char* s) {
+  fprintf(stderr, "%s\n", s);
+  exit(EXIT_FAILURE);
+}
 
 static void memory_ensure (void* p, const char* s) {
   if (!p) {
@@ -159,7 +254,7 @@ typedef struct realloc_array {
 } realloc_array;
 
 static realloc_array* realloc_array_allocate (size_t data_size, size_t size) {
-  realloc_array* ra = memory_ensure_alloc(sizeof(realloc_array), "Could not allocate realloc array");
+  realloc_array* ra = (realloc_array*) memory_ensure_alloc(sizeof(realloc_array), "Could not allocate realloc array");
   ra->array = memory_ensure_alloc(data_size * size, "Could not allocate realloc array memory");
   ra->data_size = data_size;
   ra->size = size;
@@ -167,14 +262,14 @@ static realloc_array* realloc_array_allocate (size_t data_size, size_t size) {
   return ra;
 }
 
-static void* realloc_array_grow (realloc_array* ra) {
+static realloc_array* realloc_array_grow (realloc_array* ra) {
   ra->size *= 2;
   ra->array = memory_ensure_realloc(ra->array, ra->size * ra->data_size,
                                     "Realloc array grow failed");
   return ra;
 }
 
-static void* realloc_array_shrink (realloc_array* ra) {
+static realloc_array* realloc_array_shrink (realloc_array* ra) {
   if (ra->size > ra->initial_size) {
     ra->size /= 2;
     ra->array = memory_ensure_realloc(ra->array, ra->size * ra->data_size,
@@ -205,6 +300,10 @@ static void realloc_array_free (realloc_array* ra) {
  * One warning though: When you get a pointer into the stack,
  * you must use that pointer before getting another one.
  * Otherwise, the array may have moved and the first pointer will be dangling!
+ *
+ * Note that this means using the data structure in multi-threaded code
+ * means you must lock all of the usage of the returned pointer,
+ * not just the initial get.
  */
 
 typedef struct realloc_stack {
@@ -213,7 +312,7 @@ typedef struct realloc_stack {
 } realloc_stack;
 
 static realloc_stack* realloc_stack_allocate (size_t data_size, size_t size) {
-  realloc_stack* rv = memory_ensure_alloc(sizeof(realloc_stack), "Realloc stack initialise failed");
+  realloc_stack* rv = (realloc_stack*) memory_ensure_alloc(sizeof(realloc_stack), "Realloc stack initialise failed");
   rv->ra = realloc_array_allocate(data_size, size);
   rv->rp = 0;
   return rv;
@@ -247,6 +346,10 @@ static void* realloc_stack_down (realloc_stack* rs) {
   return realloc_array_get(rs->ra, --(rs->rp));
 }
 
+static bool realloc_stack_null (realloc_stack* rs) {
+  return rs->rp == 0;
+}
+
 static void realloc_stack_free (realloc_stack* rs) {
   realloc_array_free(rs->ra);
   free(rs);
@@ -261,7 +364,7 @@ typedef struct linked_list {
 } linked_list;
 
 static linked_list* linked_list_cons (void* head, linked_list* tail) {
-  linked_list* rv = memory_ensure_alloc(sizeof(linked_list), "Linked list cons failed");
+  linked_list* rv = (linked_list*) memory_ensure_alloc(sizeof(linked_list), "Linked list cons failed");
   rv->head = head;
   rv->tail = tail;
   return rv;
@@ -320,7 +423,7 @@ typedef struct linked_array_section {
 typedef linked_list linked_array;
 
 static size_t linked_array_size (linked_array* list) {
-  linked_array_section* h = linked_list_head(list);
+  linked_array_section* h = (linked_array_section*) linked_list_head(list);
   return linked_list_tail(list) ? h->size * 2 : h->size;
 }
 
@@ -331,8 +434,8 @@ static void linked_array_initialise (linked_array_section *list, size_t data_siz
 }
 
 static linked_array *linked_array_allocate (size_t data_size, size_t length) {
-  linked_array_section* a = memory_ensure_alloc(sizeof(linked_array_section),
-                                                "Linked array initial malloc failed");
+  linked_array_section* a = (linked_array_section*) memory_ensure_alloc(sizeof(linked_array_section),
+                                                                        "Linked array initial malloc failed");
   linked_array_initialise(a, data_size, length);
   return linked_list_cons(a, NULL);
 }
@@ -343,22 +446,22 @@ static void linked_array_free_section (linked_array_section* h) {
 }
 
 static void linked_array_free_head (linked_array *list) {
-  linked_array_free_section(linked_list_head(list));
+  linked_array_free_section((linked_array_section*) linked_list_head(list));
   linked_list_free_head(list);
 }
- 
+
 static void linked_array_free (linked_array *list) {
-  linked_list_map_free(list, linked_array_free_section);
+  linked_list_map_free(list, ((void(*)(void*))linked_array_free_section));
 }
 
 static linked_array *linked_array_grow (linked_array *list) {
-  linked_array_section* h = linked_list_head(list);
-  linked_array_section* a = memory_ensure_alloc(sizeof(linked_array_section),
-                                                "Linked array grow failed");
+  linked_array_section* h = (linked_array_section*) linked_list_head(list);
+  linked_array_section* a = (linked_array_section*) memory_ensure_alloc(sizeof(linked_array_section),
+                                                                        "Linked array grow failed");
   linked_array_initialise(a, h->data_size, linked_array_size(list));
   return linked_list_cons(a, list);
 }
- 
+
 static linked_array *linked_array_shrink (linked_array *list) {
   linked_array *rest = linked_list_tail(list);
   linked_array_free_head(list);
@@ -366,11 +469,11 @@ static linked_array *linked_array_shrink (linked_array *list) {
 }
 
 static void* linked_array_get (linked_array* list, size_t index) {
-  linked_array_section* h = linked_list_head(list);
+  linked_array_section* h = (linked_array_section*) linked_list_head(list);
   while (index < h->size) {
     if (list->tail) {
       list = list->tail;
-      h = linked_list_head(list);
+      h = (linked_array_section*) linked_list_head(list);
     } else {
       return (void*) (((byte*) h->array) + (h->data_size * index));
     }
@@ -379,13 +482,13 @@ static void* linked_array_get (linked_array* list, size_t index) {
 }
 
 static bool linked_array_has (linked_array* list, void* addr) {
-  linked_array_section* h = linked_list_head(list);
-  for (; list; list = list->tail, h = linked_list_head(list)) {
-    if ((addr >= h->array) && (addr < (h->array + h->size))) {
-      return 1;
+  linked_array_section* h = (linked_array_section*) linked_list_head(list);
+  for (; list; list = list->tail, h = list ? (linked_array_section*) linked_list_head(list) : NULL) {
+    if ((addr >= h->array) && (((byte*) addr) < (((byte*)h->array) + (h->data_size * h->size)))) {
+      return TRUE;
     }
   }
-  return 0;
+  return FALSE;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -400,24 +503,23 @@ static bool linked_array_has (linked_array* list, void* addr) {
 typedef struct growable_freelist {
   linked_array* la;
   size_t lp;
-  linked_list* fl;
+  realloc_stack* fl;
 } growable_freelist;
 
-static growable_freelist* growable_freelist_allocate (size_t data_size, size_t size) {
-  growable_freelist* rv = memory_ensure_alloc(sizeof(growable_freelist),
-                                              "Could not allocate growable freelist");
+static growable_freelist* growable_freelist_allocate (size_t data_size, size_t size, size_t fl_size) {
+  growable_freelist* rv = (growable_freelist*) memory_ensure_alloc(sizeof(growable_freelist),
+                                                                   "Could not allocate growable freelist");
   rv->la = linked_array_allocate(data_size, size);
   rv->lp = 0;
-  rv->fl = NULL;
+  rv->fl = realloc_stack_allocate(data_size, fl_size);
   return rv;
 }
 
 static void* growable_freelist_get (growable_freelist* ls) {
-  linked_list* fl = ls->fl;
   void* rv;
-  if (fl) {
-    rv = linked_list_head(fl);
-    ls->fl = linked_list_tail_free(fl);
+
+  if (!realloc_stack_null(ls->fl)) {
+    rv = *((void**) realloc_stack_down(ls->fl));
   } else {
     if (ls->lp == linked_array_size(ls->la)) {
       ls->la = linked_array_grow(ls->la);
@@ -429,7 +531,7 @@ static void* growable_freelist_get (growable_freelist* ls) {
 
 /* This currently doesn't shrink memory back if a chunk becomes unused. */
 static void growable_freelist_put (growable_freelist* ls, void* addr) {
-  ls->fl = linked_list_cons(addr, ls->fl);
+  *((void**) realloc_stack_up(ls->fl)) = addr;
 }
 
 static bool growable_freelist_has (growable_freelist* ls, void* addr) {
@@ -437,7 +539,7 @@ static bool growable_freelist_has (growable_freelist* ls, void* addr) {
 }
 
 static void growable_freelist_free (growable_freelist* ls) {
-  linked_list_free(ls->fl);
+  realloc_stack_free(ls->fl);
   linked_array_free(ls->la);
   free(ls);
 }
@@ -461,15 +563,16 @@ static growable_table* growable_table_grow (growable_table* gt) {
   return gt;
 }
 
+/* or shrinkable... */
 static growable_table* growable_table_shrink (growable_table* gt) {
   return gt;
 }
 
 static linked_list** growable_table_bucket_lookup (growable_table* gt, size_t key) {
-  linked_list** bp = realloc_array_get(gt->array, (key % gt->size));
+  linked_list** bp = (linked_list**) realloc_array_get(gt, (key % gt->size));
   table_bucket* b;
   while (*bp) {
-    b = linked_list_head(*bp);
+    b = (table_bucket*) linked_list_head(*bp);
     if (b->key == key) {
       return bp;
     }
@@ -482,11 +585,11 @@ static void** growable_table_lookup_generic (growable_table* gt, size_t key, boo
   linked_list** bp = growable_table_bucket_lookup(gt, key);
   table_bucket* b;
   if (*bp) {
-    b = linked_list_head(*bp);
+    b = (table_bucket*) linked_list_head(*bp);
     return &(b->value);
   }
   if (create) {
-    b = memory_ensure_alloc(sizeof(table_bucket), "Failed to create table bucket");
+    b = (table_bucket*) memory_ensure_alloc(sizeof(table_bucket), "Failed to create table bucket");
     b->key = key;
     b->value = NULL;
     *bp = linked_list_cons(b, *bp);
@@ -507,7 +610,7 @@ static void* growable_table_get (growable_table* gt, size_t key) {
 static void growable_table_remove (growable_table* gt, size_t key) {
   linked_list** bp = growable_table_bucket_lookup(gt, key);
   linked_list*  r  = *bp;
-  table_bucket* b;
+
   if (r) {
     free(linked_list_head(r));
     *bp = linked_list_tail_free(r);
@@ -523,38 +626,150 @@ static void growable_table_free (growable_table* gt) {
 }
 
 /*---------------------------------------------------------------------------*/
+/***************************** LAMBDA TYPE ***********************************/
+
+static const byte* lambdas_start;
+
+
+/*
+ * TODO:
+ * We can possibly get rid of this flipping between pointer and case label
+ * by making the case label the same as the pointer value.
+ *
+ * This would be like:
+ * case smooth_lambdas_start + 3: // code here
+ *
+ * Just need to make sure that the switch block outputs the same fast code jumps
+ * by subtracting smooth_lambdas_start and then jumping into the table.
+ *
+ * Even though there is a subtract there, it will likely end up being faster,
+ * because we don't have all of these comparisons every time when checking function type,
+ * only when we have checked function type and found it to be a lambda.
+ */
+
+
+
+
+#ifdef RTS_STATIC
+static
+#endif
+smooth smooth_lambda (smooth x) {
+  return (smooth) (x + lambdas_start);
+}
+
+#ifdef RTS_STATIC
+static
+#endif
+smooth smooth_unlambda (smooth x) {
+  return (smooth) (((byte*) x) - lambdas_start);
+}
+
+/*---------------------------------------------------------------------------*/
+/******************************** BOXING *************************************/
+
+/*
+ * Not needed for this implementation, but perhaps sometime in the future people will want these stubs
+ * to be present so another implementation can use the same module procedures while actually providing
+ * definitions for boxing and unboxing (which might look something like these ones).
+ */
+#if 0
+
+#ifdef RTS_STATIC
+static smooth box (smooth x) {
+#else
+smooth smooth_box (smooth x) {
+#endif
+   return x;
+}
+#ifdef RTS_STATIC
+smooth smooth_box (smooth x) {
+  return box(x);
+}
+#endif
+
+
+#ifdef RTS_STATIC
+static smooth unbox (smooth x) {
+#else
+smooth smooth_unbox (smooth x) {
+#endif
+   return x;
+}
+#ifdef RTS_STATIC
+smooth smooth_unbox (smooth x) {
+  return unbox(x);
+}
+#endif
+
+#endif /* 0 */
+
+/*---------------------------------------------------------------------------*/
 /******************************** STACK **************************************/
+
+#ifndef NATIVE_STACK
+
+#ifdef STACK_STATIC
+
+static smooth smooth_stack[STACK_SIZE];
+
+static smooth* __restrict__ smooth_stack_sp = smooth_stack;
+
+#else
 
 static realloc_stack* smooth_stack;
 
+#endif
+
+
 static void stack_allocate (void) {
-  smooth_stack = realloc_stack_allocate(sizeof(smooth_t), STACK_SIZE);
+#ifndef STACK_STATIC
+  smooth_stack = realloc_stack_allocate(sizeof(smooth), STACK_SIZE);
+#endif
 }
 
-void smooth_push (smooth_t x) {
-  *((smooth_t*) realloc_stack_up(smooth_stack)) = x;
+
+#ifdef RTS_STATIC
+static
+#endif
+void smooth_stack_push (smooth x) {
+#ifdef STACK_STATIC
+#  ifndef STACK_NO_BOUNDS_CHECK
+  if (smooth_stack_sp == (smooth_stack + STACK_SIZE)) {
+    die_message("Stack overflow");
+  }
+#  endif
+  *smooth_stack_sp++ = x;
+#else
+  *((smooth*) realloc_stack_up(smooth_stack)) = x;
+#endif
 }
 
-smooth_t smooth_pop (void) {
-  return *((smooth_t*) realloc_stack_down(smooth_stack));
+
+#ifdef RTS_STATIC
+static
+#endif
+smooth smooth_stack_pop (void) {
+#ifdef STACK_STATIC
+#  ifndef STACK_NO_BOUNDS_CHECK
+  if (smooth_stack_sp == smooth_stack) {
+    die_message("Stack underflow");
+  }
+#  endif
+  return *--smooth_stack_sp;
+#else
+  return *((smooth*) realloc_stack_down(smooth_stack));
+#endif
 }
 
-void smooth_up (void) {
-  realloc_stack_up(smooth_stack);
-}
-
-void smooth_down (void) {
-  realloc_stack_down(smooth_stack);
-}
-
-smooth_t smooth_top (void) {
-  return *((smooth_t*) realloc_stack_top(smooth_stack));
-}
 
 static void stack_free (void) {
+#ifndef STACK_STATIC
   realloc_stack_free(smooth_stack);
   smooth_stack = NULL;
+#endif
 }
+
+#endif /* NATIVE_STACK */
 
 /*---------------------------------------------------------------------------*/
 /********************************* CALL REGISTER *****************************/
@@ -564,7 +779,7 @@ static void stack_free (void) {
  * it is to this most recent frame that pointers are registered.
  */
 
-static realloc_stack* call_register_frames; /* Later this will be thread specific */
+static realloc_stack* call_register_frames;
 
 static void call_register_allocate (void) {
   call_register_frames = realloc_stack_allocate(sizeof(linked_list*), CALL_REGISTER_SIZE);
@@ -574,9 +789,9 @@ static void call_register_add_frame (void) {
   *((linked_list**) realloc_stack_up(call_register_frames)) = NULL;
 }
 
-static void call_register_put (smooth_t ptr) {
-  linked_list** lb = realloc_stack_top(call_register_frames);
-  *lb = linked_list_cons(ptr, *lb);
+static void call_register_put (smooth ptr) {
+  linked_list** lb = (linked_list**) realloc_stack_top(call_register_frames);
+  *lb = linked_list_cons((void*) ptr, *lb);
 }
 
 /* Returns the top most register frame addresses in a linked list */
@@ -585,18 +800,18 @@ static linked_list* call_register_receive (void) {
 }
 
 /* Pop off the topmost frame and use it along with arg and rv to decref any lost references. */
-static void call_register_check_frame (smooth_t rv) {
+static void call_register_check_frame (smooth rv) {
   linked_list* frame;
   for (frame = call_register_receive(); frame;
        frame = linked_list_tail_free(frame)) {
-    if (linked_list_head(frame) != rv) {
-      smooth_gc_decref(linked_list_head(frame));
+    if (((smooth) linked_list_head(frame)) != rv) {
+      smooth_gc_decref(((smooth) linked_list_head(frame)));
     }
   }
 }
 
 /* Pop off the topmost frame and use it along with arg and rv to decref any lost references. */
-static void call_register_check_frame_and_arg (smooth_t rv, smooth_t arg) {
+static void call_register_check_frame_and_arg (smooth rv, smooth arg) {
   if (rv != arg) {
     smooth_gc_decref(arg);
   }
@@ -618,144 +833,369 @@ typedef struct gc_entry {
 } gc_entry;
 
 static growable_table* gc_table;
-static pthread_mutex_t gc_table_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void gc_table_allocate (void) {
-  pthread_mutex_lock(&gc_table_mutex);
   gc_table = growable_table_allocate(GC_TABLE_SIZE);
-  pthread_mutex_unlock(&gc_table_mutex);
 }
 
 static gc_entry* gc_entry_create (void) {
-  gc_entry* x = memory_ensure_alloc(sizeof(gc_entry), "GC entry create failed");
+  gc_entry* x = (gc_entry*) memory_ensure_alloc(sizeof(gc_entry), "GC entry create failed");
   x->refcount = 0;
   x->freeptrs = NULL;
   return x;
 }
 
-static void gc_entry_add_freeptr (gc_entry* e, void (*freeptr)(smooth_t)) {
-  e->freeptrs = linked_list_cons(freeptr, e->freeptrs);
+static void gc_entry_add_freeptr (gc_entry* e, void (*freeptr)(smooth)) {
+  e->freeptrs = linked_list_cons((void*) freeptr, e->freeptrs);
 }
 
-static gc_entry* gc_table_get (smooth_t ptr) {
-  gc_entry* gc_entry = growable_table_get(gc_table, ptr);
-  if (!gc_entry) {
-    gc_entry = gc_entry_create();
-    growable_table_set(gc_table, ptr, gc_entry);
+static gc_entry* gc_table_get (smooth ptr) {
+  gc_entry* entry = (gc_entry*) growable_table_get(gc_table, ptr);
+
+  if (!entry) {
+    entry = gc_entry_create();
+    growable_table_set(gc_table, ptr, entry);
   }
-  return gc_entry;
+  return entry;
 }
 
 /* If ptr is already under gc, this will still add a freeptr and incref the ptr */
-void smooth_gc_register (smooth_t ptr, void (*freeptr)(smooth_t)) {
-  gc_entry* gc_entry;
-  pthread_mutex_lock(&gc_table_mutex);
-  gc_entry = gc_table_get(ptr);
-  gc_entry_add_freeptr(gc_entry, freeptr);
-  ++gc_entry->refcount;
+void smooth_gc_register (smooth ptr, void (*freeptr)(smooth)) {
+  gc_entry* entry = gc_table_get(ptr);
+  gc_entry_add_freeptr(entry, freeptr);
+  ++entry->refcount;
   call_register_put(ptr);
-  pthread_mutex_unlock(&gc_table_mutex);
 }
 
-void smooth_gc_incref (smooth_t ptr) {
-  gc_entry* gc_entry;
-  pthread_mutex_lock(&gc_table_mutex);
-  gc_entry = gc_table_get(ptr);
-  ++gc_entry->refcount;
-  pthread_mutex_unlock(&gc_table_mutex);
+void smooth_gc_incref (smooth ptr) {
+  gc_entry* entry = gc_table_get(ptr);
+  ++entry->refcount;
 }
 
-void smooth_gc_decref (smooth_t ptr) {
-  gc_entry* gc_entry;
-  void (*freeptr)(smooth_t);
+void smooth_gc_decref (smooth ptr) {
+  gc_entry* entry;
+  void (*freeptr)(smooth);
   linked_list* freeptrs;
-  pthread_mutex_lock(&gc_table_mutex);
-  gc_entry = growable_table_get(gc_table, ptr);
-  if (gc_entry && (--(gc_entry->refcount) == 0)) {
-    freeptrs = gc_entry->freeptrs;
+
+  entry = (gc_entry*) growable_table_get(gc_table, ptr);
+
+  if (entry && (--(entry->refcount) == 0)) {
+    freeptrs = entry->freeptrs;
     growable_table_remove(gc_table, ptr);
-    pthread_mutex_unlock(&gc_table_mutex);
+
     for (; freeptrs; freeptrs = linked_list_tail_free(freeptrs)) {
-      freeptr = linked_list_head(freeptrs);
+      freeptr = (void (*)(smooth)) linked_list_head(freeptrs);
       freeptr(ptr);
     }
-  } else {
-    pthread_mutex_unlock(&gc_table_mutex);
   }
 }
 
 static void gc_table_free (void) {
-  pthread_mutex_lock(&gc_table_mutex);
+
+  /* TODO: loop across table calling the freeptrs */
+
   growable_table_free(gc_table);
   gc_table = NULL;
-  pthread_mutex_unlock(&gc_table_mutex);
 }
 
 /*---------------------------------------------------------------------------*/
 /******************************** CLOSURES ***********************************/
 
+typedef struct closure_body {
+  smooth* locals;
+  int     numlocals;
+  int     curpos;
+} closure_body;
+
+typedef struct closure {
+  smooth code;
+  int    curpos;
+  closure_body* body;
+  struct closure* parent; /* Allows access to more closed variables. */
+} closure;
+
+
+#ifdef CLOSURES_STATIC
+
+static smooth closures_body_memory[CLOSURES_BODY_SIZE];
+static smooth* __restrict__ closures_body_sp = closures_body_memory;
+static smooth closures_memory[CLOSURES_SIZE];
+static smooth* __restrict__ closures_sp = closures_memory;
+
+#  ifdef CLOSURES_FREELIST_STATIC
+static smooth closures_body_freelist[CLOSURES_BODY_FREELIST_SIZE];
+static smooth* __restrict__ closures_body_freelist_sp = closures_body_freelist;
+static smooth closures_freelist[CLOSURES_FREELIST_SIZE];
+static smooth* __restrict__ closures_freelist_sp = closures_freelist;
+#  else
+
+/*
+ * No need for fancy growable memory, but could be faster
+ * if we suddenly get lots of closures being freed at once.
+ * Very possible this will change to realloc_array at some point
+ */
+static linked_list* closures_body_freelist;
+static linked_list* closures_freelist;
+#  endif
+
+#else
+
+static growable_freelist* closures_body_memory;
 static growable_freelist* closures_memory;
-static pthread_mutex_t closures_memory_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+#endif
 
 static void closures_allocate (void) {
-  pthread_mutex_lock(&closures_memory_mutex);
-  closures_memory = growable_freelist_allocate(sizeof(smooth_closure_t), CLOSURES_SIZE);
-  pthread_mutex_unlock(&closures_memory_mutex);
+#ifdef CLOSURES_STATIC
+#  ifndef CLOSURES_FREELIST_STATIC
+  closures_freelist = realloc_stack_allocate(sizeof(closure), CLOSURES_FREELIST_SIZE);
+#  endif
+#else
+  closures_memory = growable_freelist_allocate(sizeof(closure), CLOSURES_SIZE, CLOSURES_FREELIST_SIZE);
+#endif
+
+#ifdef CLOSURES_BODY_STATIC
+#  ifndef CLOSURES_BODY_FREELIST_STATIC
+  closures_body_freelist = realloc_stack_allocate(sizeof(closure_body), CLOSURES_BODY_FREELIST_SIZE);
+#  endif
+#else
+  closures_body_memory = growable_freelist_allocate(sizeof(closure_body), CLOSURES_BODY_SIZE, CLOSURES_BODY_FREELIST_SIZE);
+#endif
 }
 
-static void closure_free (smooth_t addr) {
-  smooth_closure_t* c = (smooth_closure_t*) addr;
-  smooth_gc_decref(c->local);
-  smooth_gc_decref(c->parent);
-  pthread_mutex_lock(&closures_memory_mutex);
+static void closure_free (smooth addr) {
+  smooth_size i = 0;
+  closure* c = (closure*) addr;
+  smooth_gc_decref((smooth) c->parent);
+
+  for (i = 0; i < c->curpos; ++i) {
+    smooth_gc_decref(c->body->locals[i]);
+  }
+
+  free(c->body->locals);
+
+#ifdef CLOSURES_BODY_STATIC
+#  ifdef CLOSURES_BODY_FREELIST_STATIC
+#    ifndef CLOSURES_BODY_FREELIST_NO_BOUNDS_CHECK
+  if (closures_body_freelist_sp == (closures_body_freelist + CLOSURES_BODY_FREELIST_SIZE)) {
+    die_message("Closures freelist overflow");
+  }
+#    endif
+  *closures_body_freelist_sp++ = c->body;
+#  else
+  *((smooth*) realloc_stack_up(closures_body_freelist)) = c->body;
+#  endif
+#else
+  growable_freelist_put(closures_body_memory, (void*) c->body);
+#endif
+
+#ifdef CLOSURES_STATIC
+#  ifdef CLOSURES_FREELIST_STATIC
+#    ifndef CLOSURES_FREELIST_NO_BOUNDS_CHECK
+  if (closures_freelist_sp == (closures_freelist + CLOSURES_FREELIST_SIZE)) {
+    die_message("Closures freelist overflow");
+  }
+#    endif
+  *closures_freelist_sp++ = addr;
+#  else
+  *((smooth*) realloc_stack_up(closures_freelist)) = addr;
+#  endif
+#else
   growable_freelist_put(closures_memory, (void*) addr);
-  pthread_mutex_unlock(&closures_memory_mutex);
+#endif
+
 }
 
-smooth_t smooth_closure_create (smooth_t lambda, smooth_t local, smooth_closure_t* parent) {
-  smooth_closure_t* rv;
-  pthread_mutex_lock(&closures_memory_mutex);
-  rv = growable_freelist_get(closures_memory);
-  pthread_mutex_unlock(&closures_memory_mutex);
+static closure_body* closure_get_body (void) {
+  closure_body* rv;
 
-  smooth_gc_register(rv, closure_free);
-  smooth_gc_incref(local);
-  smooth_gc_incref(parent);
+#ifdef CLOSURES_BODY_STATIC
+#  ifdef CLOSURES_BODY_FREELIST_STATIC
+  if (closures_body_freelist_sp != closures_body_freelist) {
+    rv = *--closures_body_freelist_sp;
+  }
+#  else
+  if (!realloc_stack_null(closures_body_freelist)) {
+    rv = *((smooth*) realloc_stack_down(closures_body_freelist_sp));
+  }
+#  endif
+  else {
+#  ifndef CLOSURES_BODY_NO_BOUNDS_CHECK
+    if (closures_body_sp == (closures_body_memory + CLOSURES_BODY_SIZE)) {
+      die_message("Closures memory overflow");
+    }
+#  endif
+    rv = closures_body_sp++;
+  }
+#else
+  rv = (closure_body*) growable_freelist_get(closures_body_memory);
+#endif
 
-  rv->lambda = lambda;
-  rv->local  = local;
-  rv->parent = parent;
-
-  return (smooth_t) rv;
-}
-
-bool smooth_closure_p (smooth_t x) {
-  bool rv;
-  pthread_mutex_lock(&closures_memory_mutex);
-  rv = growable_freelist_has(closures_memory, (void*) x);
-  pthread_mutex_unlock(&closures_memory_mutex);
   return rv;
 }
 
-smooth_t smooth_closure_local (smooth_closure_t* x) {
-  return x->local;
+static closure* closure_get_head (void) {
+  closure* rv;
+
+#ifdef CLOSURES_STATIC
+#  ifdef CLOSURES_FREELIST_STATIC
+  if (closures_freelist_sp != closures_freelist) {
+    rv = *--closures_freelist_sp;
+  }
+#  else
+  if (!realloc_stack_null(closures_freelist)) {
+    rv = *((smooth*) realloc_stack_down(closures_freelist_sp));
+  }
+#  endif
+  else {
+#  ifndef CLOSURES_NO_BOUNDS_CHECK
+    if (closures_sp == (closures_memory + CLOSURES_SIZE)) {
+      die_message("Closures memory overflow");
+    }
+#  endif
+    rv = closures_sp++;
+  }
+#else
+  rv = (closure*) growable_freelist_get(closures_memory);
+#endif
+
+  return rv;
 }
 
-smooth_closure_t* smooth_closure_parent (smooth_closure_t* x) {
-  return x->parent;
+static closure_body* closure_body_create (smooth_size numlocals, smooth* args, smooth_size curpos) {
+  smooth_size i = 0;
+  closure_body* b = closure_get_body();
+  smooth* locals = (smooth*) memory_ensure_alloc(sizeof(smooth) * numlocals, "Closure variable allocation failed");
+
+  for (i = 0; i < curpos; ++i) {
+    smooth_gc_incref(args[i]);
+    locals[i] = args[i];
+  }
+
+  b->locals    = locals;
+  b->numlocals = numlocals;
+  b->curpos    = curpos;
+
+  return b;
 }
+
+#ifdef RTS_STATIC
+static smooth closure_create (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent) {
+#else
+smooth smooth_closure_create (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent) {
+#endif
+  closure_body* body = closure_body_create(n, args, args_count);
+  closure*      rv   = closure_get_head();
+
+  smooth_gc_register((smooth) rv, closure_free);
+  smooth_gc_incref((smooth) parent);
+
+  rv->code   = code;
+  rv->curpos = args_count;
+  rv->parent = (closure*) parent;
+  rv->body   = body;
+
+  return (smooth) rv;
+}
+#ifdef RTS_STATIC
+smooth smooth_closure_create (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent) {
+  return closure_create(code, n, args, args_count, parent);
+}
+#endif
+
+
+static bool is_closure (smooth x) {
+  bool rv;
+#ifdef CLOSURES_STATIC
+  rv = (x >= closures_memory) && (x < (closures_memory + CLOSURES_SIZE));
+#else
+  rv = growable_freelist_has(closures_memory, (void*) x);
+#endif
+  return rv;
+}
+
+
+#ifdef RTS_STATIC
+static smooth closure_lookup (smooth c, smooth_size i) {
+#else
+smooth smooth_closure_lookup (smooth c, smooth_size i) {
+#endif
+
+  closure* x = (closure*) c;
+
+  while (x->curpos <= i) {
+    i -= x->curpos;
+    x = x->parent;
+  }
+
+  return x->body->locals[i];
+}
+#ifdef RTS_STATIC
+smooth smooth_closure_lookup (smooth c, smooth_size i) {
+  return closure_lookup(c, i);
+}
+#endif
 
 static void closures_free (void) {
-  pthread_mutex_lock(&closures_memory_mutex);
+#ifdef CLOSURES_STATIC
+#  ifndef CLOSURES_FREELIST_STATIC
+  realloc_array_free(closures_body_freelist);
+  closures_body_freelist = NULL;
+  realloc_array_free(closures_freelist);
+  closures_freelist = NULL;
+#  endif
+#else
+  growable_freelist_free(closures_body_memory);
+  closures_body_memory = NULL;
   growable_freelist_free(closures_memory);
   closures_memory = NULL;
-  pthread_mutex_unlock(&closures_memory_mutex);
+#endif
+}
+
+static void closure_body_copy (closure* x) {
+  x->body = closure_body_create(x->body->numlocals, x->body->locals, x->curpos);
+}
+
+/*---------------------------------------------------------------------------*/
+/***************************** FUNCTION TYPE *********************************/
+
+extern size_t smooth_lambdas_length;
+
+/*
+When you use SMOOTH_*_P, exactly one of the predicates will be true, no matter what you pass.
+In other words, don't use SMOOTH_*_P unless you know you have some kind of function/procedure.
+*/
+
+static bool is_lambda (smooth x) {
+  return ((((byte*) x) >= lambdas_start) &&
+          (((byte*) x) < (lambdas_start + smooth_lambdas_length)));
 }
 
 /*---------------------------------------------------------------------------*/
 /********************************* CALL **************************************/
 
-static void call_lambda (smooth_t x) {
+/*
+ * These are just versions of apply() which are ever so slightly quicker if using our own stack
+ * hence defined only in that case.
+ * For everything else, and when using native stack, it is preferable to use apply()
+ */
+
+
+/*
+ * Unless it is possible to share * a lot * of the code from smooth_apply
+ * with this one, it will be necessary to scrap this one to keep bloat manageable.
+ */
+
+
+#ifdef NATIVE_STACK
+
+smooth smooth_execute (smooth pc, smooth self, smooth local);
+
+#else
+
+void smooth_execute (smooth pc);
+
+static void call_lambda (smooth x) {
   PUSH(NULL);
   smooth_execute(UNLAMBDA(x));
 }
@@ -764,33 +1204,38 @@ static void call_lambda (smooth_t x) {
 This does not permit having another closure as the code part of the closure.
 I'm not sure that we would ever want a closure as the code part.
 */
-static void call_closure (smooth_t x) {
-  smooth_t code = CLOSURE_CODE(x);
-  if (SMOOTH_LAMBDA_P(code)) {
+static void call_closure (smooth x) {
+  smooth code = ((closure*) x)->code;
+  if (is_lambda(code)) {
     PUSH(x);
     smooth_execute(UNLAMBDA(code));
   } else {
-    PUSH(((smooth_t (*)(smooth_closure_t*, smooth_t)) code)((smooth_closure_t*) x, POP()));
+    PUSH(((smooth (*)(closure*, smooth)) code)((closure*) x, POP()));
   }
 }
 
-static void call_primitive (smooth_t fn) {
-  smooth_t rv, arg = POP();
+static void call_primitive (smooth fn) {
+  smooth rv, arg = POP();
   call_register_add_frame();
-  rv = ((smooth_t (*)(smooth_t)) fn)(arg);
+  rv = ((smooth (*)(smooth)) fn)(arg);
   call_register_check_frame_and_arg(rv, arg);
   PUSH(rv);
 }
 
-void smooth_call (smooth_t x) {
-  if (SMOOTH_CLOSURE_P(x)) {
+#ifdef RTS_STATIC
+static
+#endif
+void smooth_call (smooth x) {
+  if (is_closure(x)) {
     call_closure(x);
-  } else if (SMOOTH_LAMBDA_P(x)) {
+  } else if (is_lambda(x)) {
     call_lambda(x);
   } else {
     call_primitive(x);
   }
 }
+
+#endif /* NATIVE_STACK */
 
 /*---------------------------------------------------------------------------*/
 /********************************* APPLY *************************************/
@@ -807,80 +1252,140 @@ v2=apply(v1, 0)
 
 */
 
+/* TODO:
+Warning: it is not this simple.
+In reality we need chains so frames so that a smooth_apply within a smooth_apply
+Does not leak data references.
+*/
+#ifdef RTS_STATIC
+static smooth apply (smooth x, smooth* args, smooth_size n) {
+#else
+smooth smooth_apply (smooth x, smooth* args, smooth_size n) {
+#endif
 
-smooth_t smooth_apply (smooth_t x, smooth_t y) {
-  smooth_t code;
-  smooth_t rv;
-  if (SMOOTH_CLOSURE_P(x)) {
-    code = CLOSURE_CODE(x);
-    if (SMOOTH_LAMBDA_P(code)) {
-      PUSH(y);
-      PUSH(x);
-      smooth_execute(UNLAMBDA(code));
-      return POP();
-    } else {
-      call_register_add_frame();
-      rv = ((smooth_t (*)(smooth_closure_t*, smooth_t)) code)((smooth_closure_t*) x, y);
-      call_register_check_frame(rv);
-      return rv;
+  smooth code;
+  smooth rv;
+
+/* If doing tail call on NATIVE_STACK, we jump here to save frame space */
+jump:
+
+  if (is_closure(x)) {
+
+    int i = 0;
+    closure* nex;
+    closure* xc = (closure*) x;
+
+    /* only need to do stuff on the closure if we are still filling args. */
+    if (xc->curpos != xc->body->numlocals) {
+
+      /* if we don't have write access to the closure, first make a copy of the body. */
+      if (xc->curpos != xc->body->curpos) {
+        closure_body_copy(xc);
+      }
+
+      /* now copy in from args until we hit the limit or run out of args. */
+      for (i = 0; (i < n) && (xc->body->curpos != xc->body->numlocals); ++i) {
+        xc->body->locals[xc->body->curpos++] = args[i];
+      }
+
+      /* now we make a new head to match this. */
+      nex = closure_get_head();
+      nex->code = xc->code;
+      nex->curpos = xc->body->curpos;
+      nex->body = xc->body;
+      nex->parent = xc->parent;
+
+      xc = nex;
     }
-    return smooth_apply_closure(x, y);
-  } else if (SMOOTH_LAMBDA_P(x)) {
-    PUSH(y);
+
+    /* if there are still args for consumption, they get applied to the code. */
+    if (i != n) {
+
+      code = xc->code;
+      if (is_lambda(code)) {
+#ifdef NATIVE_STACK
+        rv = smooth_execute(UNLAMBDA(code), (smooth) xc, args[i]);
+#else
+        PUSH(args[i]);
+        PUSH(xc);
+        smooth_execute(UNLAMBDA(code));
+        rv = POP();
+#endif
+      } else {
+        call_register_add_frame();
+        rv = ((smooth (*)(smooth, smooth)) code)((smooth) xc, args[i]);
+        call_register_check_frame(rv);
+      }
+
+      if ((n - i) == 1) {
+        return rv;
+      }
+
+      x = rv;
+      args += (i + 1);
+      n    -= (i + 1);
+      goto jump;
+
+    } else {
+      /* args ran out */
+      return (smooth) xc;
+    }
+
+  } else if (is_lambda(x)) {
+#ifdef NATIVE_STACK
+    rv = smooth_execute(UNLAMBDA(x), (smooth) NULL, args[0]);
+#else
+    PUSH(args[0]);
     PUSH(NULL);
     smooth_execute(UNLAMBDA(x));
-    return POP();
+    rv = POP();
+#endif
   } else {
     call_register_add_frame();
-    rv = ((smooth_t (*)(smooth_t)) x)(y);
+    rv = ((smooth (*)(smooth)) x)(args[0]);
     call_register_check_frame(rv);
+  }
+
+  if (n == 1) {
     return rv;
   }
+
+  x = rv;
+  ++args;
+  --n;
+  goto jump;
+
 }
-
-/*---------------------------------------------------------------------------*/
-/******************************* SPARK APPLY *********************************/
-
-typedef struct spark_call_data {
-  smooth_t f;
-  smooth_t x;
-} spark_call_data;
-
-/* Threaad count including start thread. */
-static unsigned long int threading_count = 1;
-
-/* Linked array of thread specific data. */
-static smooth_t* thread_data;
-
-/* STUB */
-pthread_t thread_alloc (void) {
-  return 0;
+#ifdef RTS_STATIC
+smooth smooth_apply (smooth x, smooth* args, smooth_size n) {
+  return apply(x, args, n);
 }
-
-static void* spark_run (void* d) {
-  spark_call_data* data = d;
-  return (void*) smooth_apply(data->f, data->x);
-}
-
-smooth_t smooth_spark_apply (smooth_t x, smooth_t y) {
-  pthread_t th = thread_alloc();
-  spark_call_data* data = memory_ensure_alloc(sizeof(spark_call_data), "Spark create failed");
-  data->f = x;
-  data->x = y;
-  smooth_t rv = pthread_create(&th, NULL, spark_run, data);
-  free(data);
-  pthread_detach(th);
-  return rv;
-}
+#endif
 
 /*---------------------------------------------------------------------------*/
 /********************************* INIT **************************************/
 
-void smooth_core_init (void) {
+#ifdef RTS_STATIC
+static
+#endif
+void smooth_core_init (const byte* ls) {
+  lambdas_start = ls;
+
+#ifndef NATIVE_STACK
   stack_allocate();
+#endif
   call_register_allocate();
   gc_table_allocate();
   closures_allocate();
+}
+
+static void smooth_core_free (void) {
+#ifndef NATIVE_STACK
+  stack_free();
+#endif
+  call_register_free();
+  gc_table_free();
+  closures_free();
 }
 
 /*---------------------------------------------------------------------------*/

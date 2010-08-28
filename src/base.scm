@@ -75,6 +75,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Library code
 
+(define false #f)
+(define true  #t)
+
+(define tail cdr)
+(define head car)
+
 (define (compose f g) (lambda (x) (f (g x))))
 
 (define (implode- acc glue l)
@@ -163,6 +169,12 @@
 ;;;
 ;;; That's it. The first module in the pipeline may want to provide a wrapper
 ;;; around this read function so that it can understand other syntax.
+
+(define cspace   #\space)
+(define cnewline #\newline)
+(define ctab     #\tab)
+(define coparen  #\()
+(define ccparen  #\))
 
 (define (parse-white-space? c)
   (and (not (eof-object? c))

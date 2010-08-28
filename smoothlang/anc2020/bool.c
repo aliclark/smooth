@@ -17,24 +17,23 @@
 
 #include "smoothlang/anc2020/smooth.h"
 
-#define NULL 0
+#define FALSE 0
+#define TRUE  1
 
-static smooth_t bool_bool_y (smooth_closure_t* self, smooth_t local) {
-  return SMOOTH_C_LOCAL(SMOOTH_C_PARENT(self)) ? SMOOTH_C_LOCAL(self) : local;
+static smooth bool_inner (smooth_closure self, smooth local) {
+  return SMOOTH_C_LOOKUP(self, 1) ? SMOOTH_C_LOOKUP(self, 0) : local;
 }
 
-static smooth_t bool_bool_x (smooth_closure_t* self, smooth_t local) {
-  return SMOOTH_C_CREATE(bool_bool_y, local, self);
+smooth smoothlang_anc2020_bool__bool_to_cbool (smooth x) {
+  return SMOOTH_APPLY(SMOOTH_APPLY(x, TRUE), FALSE);
 }
 
-smooth_t smoothlang_anc2020_bool__bool_to_cbool (smooth_t x) {
-  SMOOTH_PUSH(0);
-  SMOOTH_PUSH(1);
-  SMOOTH_CALL(x);
-  SMOOTH_CALL(SMOOTH_POP());
-  return SMOOTH_POP();
+smooth smoothlang_anc2020_bool__cbool_to_bool (smooth a) {
+  return SMOOTH_C_CREATE(bool_inner, 2, a);
 }
 
-smooth_t smoothlang_anc2020_bool__cbool_to_bool (smooth_t a) {
-  return SMOOTH_C_CREATE(bool_bool_x, a, NULL);
+smooth smoothlang_anc2020_bool__cbool_if (smooth test, smooth_lazy* a,
+                                                       smooth_lazy* b) {
+  return SMOOTH_FORCE(test ? a : b);
 }
+

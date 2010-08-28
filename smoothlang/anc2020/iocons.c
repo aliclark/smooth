@@ -39,16 +39,14 @@
  */
 
 
-typedef unsigned long int size_t;
-void  free   (void* p);
-void* malloc (size_t s);
+#include <stdlib.h>
 
 typedef struct iocons_s {
-  smooth_t x; /* The IO value */
-  smooth_t y; /* The RealWorld value */
+  smooth x; /* The IO value */
+  smooth y; /* The RealWorld value */
 } iocons_t;
 
-static void iocons_free (smooth_t a) {
+static void iocons_free (smooth a) {
   iocons_t* c = (iocons_t*) a;
   smooth_gc_decref(c->x);
   smooth_gc_decref(c->y);
@@ -56,21 +54,21 @@ static void iocons_free (smooth_t a) {
 }
 
 /* WARNING unless this is added to a gc somehow, you will find it leaks! */
-smooth_t smoothlang_anc2020_iocons__iocons (smooth_t x, smooth_t y) {
+smooth smoothlang_anc2020_iocons__iocons (smooth x, smooth y) {
   iocons_t* c = malloc(sizeof(iocons_t));
   c->x = x;
   c->y = y;
   smooth_gc_incref(x); /* This effectively pins the objects until we get deleted. */
   smooth_gc_incref(y);
-  smooth_gc_register((smooth_t) c, iocons_free);
-  return (smooth_t) c;
+  smooth_gc_register((smooth) c, iocons_free);
+  return (smooth) c;
 }
 
-smooth_t smoothlang_anc2020_iocons__iocons_car (smooth_t x) {
+smooth smoothlang_anc2020_iocons__iocons_car (smooth x) {
   return ((iocons_t*) x)->x;
 }
 
-smooth_t smoothlang_anc2020_iocons__iocons_cdr (smooth_t x) {
+smooth smoothlang_anc2020_iocons__iocons_cdr (smooth x) {
   return ((iocons_t*) x)->y;
 }
 

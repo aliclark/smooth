@@ -118,7 +118,7 @@
 ;;; For the copied lambda references we can use another table called internal-copies,
 ;;; with copyid => lamref
 
-((lambda x (a b c x)) 3)
+;((lambda x (a b c x)) 3)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

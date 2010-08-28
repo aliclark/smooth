@@ -16,6 +16,197 @@
 
 (load "base.scm")
 
+
+;Current problem:
+;
+; There are two main bottlenecks for multithreading.
+;
+; The first is that currently threads share access to the closures memory space.
+;  This space is needed to be well defined for type checking on function calls.
+;
+; The second is the copy of call mechanism used by closures to allow a closure to be called multiple times.
+;  This likewise has to be locked to ensure multiple threads don't compete over whether copy_on_call is set.
+;  Note that this problem case will completely disappear if we go back to using one var per lambda
+;  or use copy on call all of the time (as opposed to only after the initial call).
+;  Thus it will not be considered for now.
+;
+; The third case likewise the first but with the garbage collection system
+;
+; The other cases could be solved if we had the closures mem and/or the garbage collection
+; a one per thread.
+;
+; This could mean that we continually pass around a thread id (or a thread data structure)
+; between functions so we know which of the global thread models we are currently referring to.
+;
+; This would make our native calling system somewhat uglier :(
+;
+; That is only half the story;
+; we still need to figure out how to create the memory for a new thread
+; and also what happens when someone wants to use data from one thread over in another one.
+;
+; It might be helpful to find out how Erlang solves these issues.
+;
+; *make sure malloc/realloc/free is thread safe else make some wrappers for the allocations.
+;
+; Because of unboxedness, it is unknown at any given time whether a value
+; is recorded in a given thread's system, or just coincidentally has the same number.
+;
+; It is equally unknown whether an argument value is a pointer to a closure or just a corresponding number.
+;
+; Currently we have:
+; smooth_call(f, x)
+;
+; This would have to change to:
+; smooth_call(thread, f, x)
+;
+; Because since f is an int_ptr just like any other, we would not know which thread's closures it could correspond to.
+; Attempting to check each thread's closure list whenever we make a function call is not an option!
+;
+; With this restriction in place we need to know whether it is really viable to restrict calls in this way to a per thread basis.
+;
+
+; EVALUATION STRATEGY:
+;
+; The default execution model at run-time will be entirely call by need
+; (whereas at compile time all lambdas are fully reduced, until a cycle occurs).
+;
+; However, the compiler will accept hints from module functions to say
+; whether the arguments are strict or lazy.
+;
+; This may mean that the following definition:
+;
+;   smooth_t smoothlang_anc2020_cbool__if (smooth_t test, smooth_t a, smooth_t b);
+;
+; can be changed to the following:
+;
+;   smooth_t smoothlang_anc2020_cbool__if (smooth_t test, lazy_t a, lazy_t b);
+;
+; likely implementation:
+;
+;   smooth_t smoothlang_anc2020_cbool__if (smooth_t test, lazy_t a, lazy_t b) {
+;     return test ? a : b;
+;   }
+;
+; The c-mod phase will notice this declaration and will find the value of test
+; before calling cbool__if() but will thunk up 'a' and 'b'.
+; The user will then be responsible for calling smooth_force on the return value
+; to ensure it gets evaluated.
+;
+; smooth_t smooth_force (smooth_t x); // does exactly what it says on the tin
+;
+; Also allow lazy hints to be specified using some other method not directly
+; affecting the C code such as a special comment like:
+;
+; /*SMOOTH smooth_t smoothlang_anc2020_cbool__if (smooth_t test, lazy_t a, lazy_t b); */
+;
+; This approach to evaluation removes possibilty for the warm and fuzzy definition of `if`,
+; that is, a simple function that returns a lazily executed value.
+;
+; It does however maintain the possibility of running the entire vm unboxed,
+; and this has always been a core priority of smooth.
+;
+; This approach will be better suited than another one for the majority of users.
+;
+
+
+;
+; Instead of repeating the same optimisation code over and over again,
+; it would be nice to be able to run module code directly from the compiler,
+; so eg.
+;   SMOOTH_OPT smooth_t square (smooth_t x) { return x * x; }
+; could be called when a value is available, with the result being used instead.
+;
+; It might not be possible to use this in all places when considering pointers
+; as opposed to raw numerical values, and it would probably be necessary
+; to keep use of additional ways to specify optimisations.
+;
+
+
+;
+; Something to look out for:
+; If a lambda is applied twice in the same C module call, eg:
+;
+; r1 = smooth_apply(f1, x1);
+; r2 = smooth_apply(f1, x2);
+;
+; then if the call is adding a variable to a closure,
+; the closure must either be copied for at least the second call,
+; or it must be created dynamically for at least the second call.
+;
+; We add the copy_on_write flag.
+; Upon completion of the first call, this is set true.
+; For all successive calls on the closure object, a copy is made.
+;
+; Of course, copy_on_write will thus need protection for multithreading;
+; This is a major headache, unless we're okay with creating thousands of mutexes.
+;
+;
+;
+; typedef struct closure {
+;   closure* parent;
+;   smooth_t code;
+;   smooth_t local; /* Either a pointer to locals or a single local */
+;   /* The following were added to the model to allow O(1) varrefs */
+;   unsigned int num_locals; /* if num_locals=1 `local` is a value, else ptr */
+;   unsigned int locals_depth; /* how many arguments have been filled */
+;   bool copy_on_write; /* tells us whether the closure needs copying next call */
+; } closure;
+;
+
+
+;
+; typedef struct lazy {
+;   bool unrun; // this needs better locking if we want to ensure running once only.
+;   smooth_t preval[3]; // however many prevals we have
+;   void (*func)(struct lazy*);
+;   closure* wrt; // with respect to a closure (possibly null).
+; } lazy;
+;
+; void internal_lazy_0 (lazy* self) {
+;   if (unrun) {
+;     unrun = false;
+;     self->preval[0] = smoothlang_anc2020_putchar('b', LAMBDA(32));
+;   }
+; }
+;
+; The main program expression will be interpreted as a lazy expression,
+; and as will use the canonical smooth_force(lazyval) for elegance
+; even if it is slightly slower than hardcoding in the correct bits of code.
+;
+; * Every expression that is used more than once MUST be stored after its first calculation
+;   and the stored value used from then onwards.
+;   It is still undecided on which object the preval is to be stored,
+;   but it is preferably as close to the object that binds the last value as possible.
+; * Each expression must be calculated as soon as enough variable values are known,
+;   and the closest enclosing lazy section has been forced.
+;   (for a putchar('b') type expression,
+;    this will be immediately upon forcing the main expression,
+;    since all arguments are known at that point).
+;
+; A strict value can be modelled as a lazy value that has been smooth_forced immediately.
+; it is only through optimisations that we are able to remove the thunking and forcing,
+; but semantically they are there, albeit pointlessly.
+;
+
+
+;
+; A moderate incompatibily between smooth programs and plain C code:
+; * floats and doubles, while not impossible to create via division of smooth_t integers,
+;   are quite expensive to get into programs initially (but not too tricky once created).
+;
+; Since we are only writing out a single C file anyway,
+; these float constants will have to be written out to memory there to a static array.
+;
+; Within the program, calls such as smooth_float_create(1, 3) /* representing (1/3) */
+; can easily be replaced by a pointer to the float value in our initial array.
+;
+; /* somewhere in the variable definitions */
+; static double smoothlang_anc2020_double__initdata[3] = { 3.23452, 435.56236, 0.0320234 };
+;
+; /* somewhere in the program */
+; smoothlang_anc2020_double__divide(smoothlang_anc2020_double__initdata + 2,
+;                                   smoothlang_anc2020_double__initdata + 0);
+
 ; The input to this stage takes up a very strict form.
 ;
 ; input is E
@@ -109,15 +300,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (rearitise-leaves p)
-  (p-list
-    (if (lambda-expression? (p-first p))
-      (lambda-expression-mk (lambda-expression-var (p-first p))
-        (rearitise-primops (lambda-expression-body (p-first p))))
-      (if (non-resvd-list? (p-first p))
-        (p-list (rearitise-leaves (p-first (p-first p)))
-          (rearitise-primops (p-second (p-first p))))
+  (if (lambda-expression? p)
+    (lambda-expression-mk (lambda-expression-var p)
+      (rearitise-primops (lambda-expression-body p)))
+    (p-list
+      (if (lambda-expression? (p-first p))
+        (lambda-expression-mk (lambda-expression-var (p-first p))
+          (rearitise-primops (lambda-expression-body (p-first p))))
+        (if (non-resvd-list? (p-first p))
+          (p-list (rearitise-leaves (p-first (p-first p)))
+            (rearitise-primops (p-second (p-first p))))
         (p-first p)))
-    (rearitise-primops (p-second p))))
+      (rearitise-primops (p-second p)))))
 
 (define (deep-head-length- p n)
   (if (non-resvd-list? p)
@@ -144,6 +338,7 @@
 ;; Note that if eg. f is of arity 2, and is giving 4 args we get the following:
 ;; (((f x1 x2) x3) x4)
 (define (rearitise-primops p)
+;  (pretty-print p)
   (cond
     ((lambda-expression? p)
       (lambda-expression-mk (lambda-expression-var p)
@@ -316,7 +511,7 @@
 
     (else (rex-mk p true))))
 
-(define (reduce-expression p) (rex-ex (reduce-expression p)))
+(define (reduce-expression p) (rex-ex (reduce-expression- p)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -383,8 +578,26 @@
 ;; This will take a normal parse tree and pull bits of it out into hash tables,
 ;; leaving references in their place.
 
+
+;; Turn off smooth compiler optimisations
+
+(define (reduce-expression x) x)
+
+(define (send-out-prevals  x)
+  (send-out-preval x))
+
+
 (define (transform-internal p)
   (send-out-prevals (reduce-expression (send-out-lambdas (replace-varrefs (rearitise-primops p))))))
+
+; Possible alternative stage order
+;
+; (send-out-prevals [ (group-closures (send-out-lambdas  (rearitise-primops ] (replace-varrefs (reduce-expression))))))
+;
+; Here the brace is used to indicate passes that could potentially be merged into a single pass.
+;
+; It may even be possible to merge "send-out-prevals" in just before "group-closures",
+; but I'll wait until the first 3 here are merged successfully before attempting.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -394,7 +607,7 @@
     ((varref? x) (string-append "VARIABLE_LOOKUP(" (number->string (varref-val x)) ")"))
     ((lamref? x)
       (if inl
-        (string-append "CLOSURE(" (number->string (lamref-id x)) ")")
+        (string-append "closure_single(LAMBDA(" (number->string (lamref-id x)) "), VARIABLE_LOOKUP(0))")
         (string-append "LAMBDA(" (number->string (lamref-id x)) ")")))
     ((preval? x) (string-append "preval[" (number->string (preval-id x)) "]"))
     ((primop-symbol? x) (primop-to-id x))
@@ -403,7 +616,7 @@
         (string-append (tocstr (p-first x) inl) "("
           (implode ", " (map (lambda (p) (tocstr p inl)) (tail x)))
           ")")
-        (string-append "APPLY(" (tocstr (p-first x) inl) ", "
+        (string-append "apply_single(" (tocstr (p-first x) inl) ", "
           (tocstr (p-second x) inl)
           ")")))))
 
@@ -420,7 +633,7 @@
 (define (lambda-to-code x)
   (string-append "    case " (number->string (car x)) ":\n"
   (let ((c (cdr x)))
-    (string-append "      PUSH(" (tocstr c true) ")\n"))
+    (string-append "      PUSH(" (tocstr c true) ");\n"))
   "      break;\n"))
 
 (define (generate-lambdas-code)
@@ -437,7 +650,7 @@
 (define (generate-internal)
   (if (= internal-prevals-id 0)
     "
-#define EXIT_SUCCESS 0
+#include \"smoothlang/anc2020/smooth_core.h\"
 
 int main (void) { return EXIT_SUCCESS; }
 
@@ -448,45 +661,67 @@ int main (void) { return EXIT_SUCCESS; }
 "
 (generate-externs)
 "
-static smooth_t preval[" (number->string internal-prevals-id) "];
+static smooth preval[" (number->string internal-prevals-id) "];
+
+
+/*
+ * Module optimisation definitions will allow static memory to be defined here
+ * containing any kind of C data desired.
+ */
+
 
 /* Allocate some memory which we can shadow to use as ID addresses for our lambda tags. */
 #define SMOOTH_LAMBDAS_LENGTH " (number->string internal-lambdas-id) "
-unsigned long int smooth_lambdas_length = SMOOTH_LAMBDAS_LENGTH;
-byte smooth_lambdas_start[SMOOTH_LAMBDAS_LENGTH];
+const unsigned long int smooth_lambdas_length = SMOOTH_LAMBDAS_LENGTH;
+static const byte smooth_lambdas_start[SMOOTH_LAMBDAS_LENGTH];
 
-#if 0
+static smooth apply_single (smooth f, smooth v) {
+  return APPLY(f, &v, 1);
+}
 
-/* Not sure if it is good to change to this definition, but something worth considering. */
-void smooth_execute (smooth_t pc, smooth_closure_t* self, smooth_t local) {
-  unsigned long int i;
+static smooth closure_single (smooth lam, smooth local) {
+  return CLOSURE_CREATE(lam, 1, &local, 1, (smooth) NULL);
+}
 
+#ifdef NATIVE_STACK
+smooth smooth_execute (smooth pc, smooth self, smooth local) {
 #else
-
-void smooth_execute (smooth_t pc) {
-  unsigned long int i;
-  smooth_closure_t* self;
-  smooth_t local;
-
+void smooth_execute (smooth pc) {
 #endif
 
-#if 0
+#ifndef NATIVE_STACK
+  /* we need to to extract the args from args and put them onto our own stack. */
+  smooth self;
+  smooth local;
+  int i;
+#endif
+  /* TODO: This will be used to hold function body working locals */
+  smooth tmp[1];
+
+#ifndef NATIVE_STACK
+push_jump:
+  self  = POP();
+  local = POP();
+  i     = POP();
+  tmp   = POP();
+#endif
+
 jump:
-#endif
-
   switch (pc) {
 "
 (generate-lambdas-code)
 "  }
 
+  /* This will not happen but helps keep the compiler happy */
+  return 0;
 }
 
-int main (const int argc, const char** const argv) {
+int main (int argc, char** argv) {
 
-  smooth_argc = (smooth_t) argc;
-  smooth_argv = (smooth_t) argv;
+  smooth_argc = argc;
+  smooth_argv = argv;
 
-  CORE_INIT();
+  CORE_INIT(smooth_lambdas_start);
 
 "
 (generate-prevals-code)

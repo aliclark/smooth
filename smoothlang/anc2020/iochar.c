@@ -24,37 +24,41 @@
 #define cfputc(c, s) putc((int) c, (FILE*) s)
 #define cfgetc(s)    getc((FILE*) s)
 
-smooth_t iocons (smooth_t, smooth_t);
+smooth iocons (smooth, smooth);
 
-smooth_t smoothlang_anc2020_iochar__stdin;
-smooth_t smoothlang_anc2020_iochar__stdout;
-smooth_t smoothlang_anc2020_iochar__stderr;
+/*TYPE:(c_FILE a)*/ smooth smoothlang_anc2020_iochar__stdin;
+/*TYPE:(c_FILE a)*/ smooth smoothlang_anc2020_iochar__stdout;
+/*TYPE:(c_FILE a)*/ smooth smoothlang_anc2020_iochar__stderr;
 
-smooth_t smoothlang_anc2020_iochar__iochar_init (smooth_t z) {
-  smoothlang_anc2020_iochar__stdin  = (smooth_t) stdin;
-  smoothlang_anc2020_iochar__stdout = (smooth_t) stdout;
-  smoothlang_anc2020_iochar__stderr = (smooth_t) stderr;
+/*TYPE:(numeral z) -> (iocons b z)*/
+smooth smoothlang_anc2020_iochar__iochar_init (smooth z) {
+  smoothlang_anc2020_iochar__stdin  = (smooth) stdin;
+  smoothlang_anc2020_iochar__stdout = (smooth) stdout;
+  smoothlang_anc2020_iochar__stderr = (smooth) stderr;
   return iocons(0, z);
 }
 
-smooth_t smoothlang_anc2020_iochar__cfputc_opt (smooth_t c, smooth_t s) {
+smooth smoothlang_anc2020_iochar__cfputc_opt (smooth c, smooth s) {
   return cfputc(c, s);
 }
 
-smooth_t smoothlang_anc2020_iochar__cfgetc_opt (smooth_t s) {
+smooth smoothlang_anc2020_iochar__cfgetc_opt (smooth s) {
   return cfgetc(s);
 }
 
-smooth_t smoothlang_anc2020_iochar__cfputc (smooth_t c, smooth_t s, smooth_t i) {
-  return iocons(cfputc(c, s), i);
+/*TYPE:(c_Char a) -> (c_FILE s) -> (numeral i) -> (iocons c_Char i)*/
+smooth smoothlang_anc2020_iochar__cfputc (smooth c, smooth s, smooth z) {
+  return iocons(cfputc(c, s), z);
 }
 
-smooth_t smoothlang_anc2020_iochar__cfgetc (smooth_t s, smooth_t i) {
-  return iocons(cfgetc(s), i);
+/*TYPE:(c_FILE s) -> (numeral i) -> (iocons c_Char i)*/
+smooth smoothlang_anc2020_iochar__cfgetc (smooth s, smooth z) {
+  return iocons(cfgetc(s), z);
 }
 
 /* If we get *really* good at optimisation,
  * we might be able to replace consequetive cfputc_opt calls with this. */
-smooth_t smoothlang_anc2020_iochar__cfputs_opt (smooth_t x, smooth_t s) {
+smooth smoothlang_anc2020_iochar__cfputs_opt (smooth x, smooth s) {
   return fputs((char*) x, (FILE*) s);
 }
+
