@@ -898,6 +898,44 @@ static void gc_table_free (void) {
   gc_table = NULL;
 }
 
+#ifdef RTS_STATIC
+static
+#endif
+smooth smooth_gc_decref_scope (smooth closure, smooth* locals, smooth_size numlocals, smooth rv) {
+  bool done_rv = FALSE;
+  smooth_size i = 0;
+
+  for (i = 0; i < numlocals; ++i) {
+    if (!done_rv && (locals[i] == rv)) {
+      done_rv = TRUE;
+      continue;
+    }
+    smooth_gc_decref(locals[i]);
+  }
+
+  /*
+   * If it hasn't been found yet, it was definitely in the closure locals.
+   * The free handler for closure is going to decref the rv when we free the closure,
+   * so we have to incref rv first.
+   * To do it any other way would require lots of meddling I think.
+   */
+  if (!done_rv) {
+    smooth_gc_incref(rv);
+  }
+  smooth_gc_decref(closure);
+
+  return rv;
+}
+
+void smooth_gc_remove_scope (smooth closure, smooth* locals, smooth_size numlocals) {
+  smooth_size i = 0;
+
+  for (i = 0; i < numlocals; ++i) {
+    smooth_gc_decref(locals[i]);
+  }
+  smooth_gc_decref(closure);
+}
+
 /*---------------------------------------------------------------------------*/
 /******************************** CLOSURES ***********************************/
 
@@ -1062,13 +1100,15 @@ static closure* closure_get_head (void) {
   return rv;
 }
 
-static closure_body* closure_body_create (smooth_size numlocals, smooth* args, smooth_size curpos) {
+static closure_body* closure_body_create (smooth_size numlocals, smooth* args, smooth_size curpos, bool do_incref) {
   smooth_size i = 0;
   closure_body* b = closure_get_body();
   smooth* locals = (smooth*) memory_ensure_alloc(sizeof(smooth) * numlocals, "Closure variable allocation failed");
 
   for (i = 0; i < curpos; ++i) {
-    smooth_gc_incref(args[i]);
+    if (do_incref) {
+      smooth_gc_incref(args[i]);
+    }
     locals[i] = args[i];
   }
 
@@ -1079,16 +1119,15 @@ static closure_body* closure_body_create (smooth_size numlocals, smooth* args, s
   return b;
 }
 
-#ifdef RTS_STATIC
-static smooth closure_create (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent) {
-#else
-smooth smooth_closure_create (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent) {
-#endif
-  closure_body* body = closure_body_create(n, args, args_count);
+static smooth closure_create_refd (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent, bool do_incref) {
+  closure_body* body = closure_body_create(n, args, args_count, do_incref);
   closure*      rv   = closure_get_head();
 
   smooth_gc_register((smooth) rv, closure_free);
-  smooth_gc_incref((smooth) parent);
+
+  if (do_incref) {
+    smooth_gc_incref((smooth) parent);
+  }
 
   rv->code   = code;
   rv->curpos = args_count;
@@ -1097,11 +1136,24 @@ smooth smooth_closure_create (smooth code, smooth_size n, smooth* args, smooth_s
 
   return (smooth) rv;
 }
+
+#ifdef RTS_STATIC
+static smooth closure_create (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent) {
+#else
+smooth smooth_closure_create (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent) {
+#endif
+  return closure_create_refd(code, n, args, args_count, parent, TRUE);
+}
 #ifdef RTS_STATIC
 smooth smooth_closure_create (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent) {
   return closure_create(code, n, args, args_count, parent);
 }
 #endif
+
+
+static smooth smooth_closure_create_internal (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent) {
+  return closure_create_refd(code, n, args, args_count, parent, FALSE);
+}
 
 
 static bool is_closure (smooth x) {
@@ -1153,7 +1205,7 @@ static void closures_free (void) {
 }
 
 static void closure_body_copy (closure* x) {
-  x->body = closure_body_create(x->body->numlocals, x->body->locals, x->curpos);
+  x->body = closure_body_create(x->body->numlocals, x->body->locals, x->curpos, TRUE);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -1263,20 +1315,28 @@ static smooth apply (smooth x, smooth* args, smooth_size n) {
 smooth smooth_apply (smooth x, smooth* args, smooth_size n) {
 #endif
 
+  closure* nex;
+  closure* xc;
+  smooth_size argsused;
   smooth code;
   smooth rv;
-#ifndef NATVIE_STACK
-  smooth j;
+  int i;
+#ifndef NATIVE_STACK
+  int j;
 #endif
 
 /* If doing tail call on NATIVE_STACK, we jump here to save frame space */
 jump:
+  xc   = NULL;
+  i    = 0;
+  code = x;
+#ifndef NATIVE_STACK
+  j    = 0;
+#endif
 
   if (is_closure(x)) {
 
-    int i = 0;
-    closure* nex;
-    closure* xc = (closure*) x;
+    xc = (closure*) x;
 
     /* only need to do stuff on the closure if we are still filling args. */
     if (xc->curpos != xc->body->numlocals) {
@@ -1301,83 +1361,53 @@ jump:
       xc = nex;
     }
 
-/*
-
-(lambda (x1...x50)
-  x4
-)
-
- */
-
-    /* if there are still args for consumption, they get applied to the code. */
-    if (i != n) {
-
-      code = xc->code;
-      if (is_lambda(code)) {
-#ifdef NATIVE_STACK
-        return smooth_execute(UNLAMBDA(code), (smooth) xc, args, n);
-#else
-        for (j = n - 1; j >= i; --j) {
-          PUSH(args[j]);
-        }
-        PUSH(n - i);
-
-        PUSH(xc);
-        smooth_execute(UNLAMBDA(code));
-        rv = POP();
-#endif
-      } else {
-        call_register_add_frame();
-        rv = ((smooth (*)(smooth, smooth)) code)((smooth) xc, args[i]);
-        call_register_check_frame(rv);
-
-        if ((n - i) == 1) {
-          return rv;
-        }
-
-        x = rv;
-        args += (i + 1);
-        n    -= (i + 1);
-        goto jump;
-      }
-
-    } else {
+    if (i == n) {
       /* args ran out */
       return (smooth) xc;
     }
 
-  } else if (is_lambda(x)) {
+    /* if there are still args for consumption, they get applied to the code. */
+    code = xc->code;
 
-    // if we're not quite there, we create a closure instead.
-    if (n < (*((smooth_size*) x))) {
-      return smooth_closure_create(x, *((smooth_size*) x), args, n, NULL);
+  }
+
+  if (is_lambda(code)) {
+
+    argsused = *((smooth_size*) code);
+
+    /* if we're not quite there, we create a closure instead. */
+    if (is_lambda(x) && (n < argsused)) {
+      return smooth_closure_create_internal(code, argsused, args, n, (smooth) xc);
     }
 
 #ifdef NATIVE_STACK
-    return smooth_execute(UNLAMBDA(x), (smooth) NULL, args, n);
+    rv = smooth_execute(UNLAMBDA(code), (smooth) xc, args, argsused);
 #else
-    for (i = n - 1; i >= 0; --i) {
-      PUSH(args[i]);
+    for (j = argsused - 1; j >= i; --j) {
+      PUSH(args[j]);
     }
-    PUSH(n);
-    PUSH(NULL);
-    smooth_execute(UNLAMBDA(x));
-    return POP();
+    PUSH(argsused - i);
+
+    PUSH(xc);
+    smooth_execute(UNLAMBDA(code));
+    rv = POP();
 #endif
   } else {
+    argsused = 1;
+
     call_register_add_frame();
-    rv = ((smooth (*)(smooth)) x)(args[0]);
+    rv = ((smooth (*)(smooth, smooth)) code)((smooth) xc, args[i]);
     call_register_check_frame(rv);
-
-    if (n == 1) {
-        return rv;
-    }
-
-    x = rv;
-    ++args;
-    --n;
-    goto jump;
   }
+
+  if ((n - i) == argsused) {
+    return rv;
+  }
+
+  x = rv;
+  args += (i + argsused);
+  n    -= (i + argsused);
+  goto jump;
 
 }
 #ifdef RTS_STATIC

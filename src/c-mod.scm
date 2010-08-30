@@ -17,6 +17,14 @@
 (load "base.scm")
 
 
+;
+; Note: currently the ref counting is not correct for the case
+; where varref is used as the function.
+;
+
+
+
+
 ;Current problem:
 ;
 ; There are two main bottlenecks for multithreading.
@@ -268,6 +276,14 @@
 (define (preval-mk n) (reserved-symbol-mk 'preval (string->symbol (number->string n))))
 (define (preval? x) (reserved-symbol-type? x 'preval))
 (define (preval-id x) (string->number (symbol->string (reserved-symbol-val x))))
+
+(define (tmpref-mk n) (reserved-symbol-mk 'tmpref (string->symbol (number->string n))))
+(define (tmpref? x) (reserved-symbol-type? x 'tmpref))
+(define (tmpref-id x) (string->number (symbol->string (reserved-symbol-val x))))
+
+(define (localref-mk n) (reserved-symbol-mk 'localref (string->symbol (number->string n))))
+(define (localref? x) (reserved-symbol-type? x 'localref))
+(define (localref-id x) (string->number (symbol->string (reserved-symbol-val x))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -616,6 +632,137 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+;The anatomry of function code generation...
+;
+;There is not much complicated stuff that needs to be done really.
+;
+;A lambda body has either a variable lookup or a function call.
+;
+;The function call may make use of 'tmp's and it may make use of prevals in future
+;
+;The code will incref everything before it is called or called with initially,
+;but will not do incref's on subsequent intermediate values
+;(unless it is a local variable being used in more than one place)
+
+
+
+(define (flatten-args x)
+  (if (and (non-resvd-list? x) (non-resvd-list? (car x)))
+    (cons (flatten-args (caar x)) (cons (cadar x) (cdr x)))
+    x))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; callers
+;;
+;; This style of function takes a flatx, startt and inl and returns
+;; (list precommands item tmps copyrefs)
+;;
+;; flatx is a flat list of (func args...)
+;; startt is the number to start taking tmps from
+;; inl is whether or not we are in a lambda (and thus need to do closures)
+;;
+;; Where precommands is a list in order of lines to run firt
+;; item is the embeddable value representing the expression
+;; and tmps is the number of temporary variable used in the expression.
+;; copyrefs is the list of all things that are used
+;; possibly multiple entries for a value
+
+(define (itemstr- x inl id suppress)
+  (cond
+    ((symbol? x) (symbol->string x))
+    ((number? x) (number->string x))
+    ((tmpref? x) (string-append "tmp[" (number->string (tmpref-id x)) "]"))
+    ((varref? x) (string-append "VARIABLE_LOOKUP(" (number->string (varref-val x)) ")"))
+    ((localref? x) (string-append "locals[" (number->string (localref-id x)) "]"))
+    ((lamref? x)
+      (if inl
+        (string-append "closure_single(LAMBDA(" (number->string (lamref-id x)) "), VARIABLE_LOOKUP(0))")
+        (string-append "LAMBDA(" (number->string (lamref-id x)) ")")))
+    ((preval? x) (string-append "preval[" (number->string (preval-id x)) "]"))
+    ((primop-symbol? x) (primop-to-id x))
+    ((non-resvd-list? x)
+      (string-append id (itemstr- (car x) inl id true) "(" (implode ", " (map (lambda (y) (itemstr- y inl "" true)) (cdr x)))
+        (if suppress ")" ");\n")))
+    (else (pretty-print x))))
+
+(define (itemstr x inl id) (itemstr- x inl id false))
+
+(define (cstr-argexprs args startt)
+  (if (null? args)
+    (list (list) (list) startt (list) startt)
+    (let ((item (car args)))
+      (if (non-resvd-list? item)
+        (let* ((rx (cstr-funcall item startt))
+               (ry (cstr-argexprs (cdr args) (caddr rx))))
+          (list
+            (append (car rx) (car ry))
+            (cons (cadr rx) (cadr ry))
+            (caddr ry)
+            (append (cadddr rx) (cadddr ry))
+            (listmax (list (cadr (cdddr rx)) (cadr (cdddr ry))))))
+        (let  ((ry (cstr-argexprs (cdr args) startt)))
+          (list
+            (cons (list 'INCREF item) (car ry))
+            (cons item (cadr ry))
+            (caddr ry)
+            (cons item (cadddr ry))
+            (cadr (cdddr ry))))))))
+
+(define (listmax l)
+  (define (lm l z)
+    (if (null? l) z (lm (cdr l) (if (> (car l) z) (car l) z))))
+  (lm (cdr l) (car l)))
+
+(define (mapn f l)
+  (let loop ((ll l) (n 0) (rv '()))
+    (if (null? ll) (reverse rv)
+      (loop (cdr ll) (+ n 1) (cons (f (car ll) n) rv)))))
+
+(define (cstr-funcall-primop flatx startt)
+  (let* ((ae (cstr-argexprs (cdr flatx) (inc startt)))
+         (tmps (tmpref-mk startt)))
+    (list
+      (append
+        (apply append (map car ae))
+        (list (list 'SET tmps (cons (primop-to-id x) ae))))
+      tmps
+      (listmax (cons startt (map caddr ae)))
+      (apply append (map cadddr ae))
+      (cadr (cdddr ae)))))
+
+(define (cstr-funcall-local flatx startt)
+  (let* ((ae (cstr-argexprs (cdr flatx) (inc startt)))
+         (tmps (tmpref-mk startt))
+         (setl (list 'SET tmps (list 'APPLY (car flatx) 'locals (length (cadr ae))))))
+    (list
+      (append
+        (car ae)
+        (list (list 'INCREF (car flatx)))
+        (mapn (lambda (x n) (list 'SET (localref-mk n) x)) (cadr ae))
+        (list setl))
+      tmps
+      (caddr ae)
+      (cadddr ae)
+      (listmax (list (cadr (cdddr ae)) (length (cadr ae)))))))
+
+;; Currently we have a basic apply(fn, x)
+;; but would like this to be apply(fn, xs, n)
+(define (cstr-funcall x startt)
+  (let* ((flatx (flatten-args x))
+         (fn (car flatx)))
+    (cond
+      ((primop-symbol? fn) (cstr-funcall-primop flatx startt))
+      ((or (varref? fn) (lamref? fn)) (cstr-funcall-local flatx startt))
+      (else (print 'unsure-case)))))
+
+(define (cstr-code x startt)
+  (if (non-resvd-list? x)
+    (cstr-funcall x startt)
+    (list (list) x startt (list x) 0)))
+
+;;;;;;;;;;;;;;;
+
 (define (tocstr x inl)
   (cond
     ((symbol? x) (symbol->string x))
@@ -626,14 +773,7 @@
         (string-append "LAMBDA(" (number->string (lamref-id x)) ")")))
     ((preval? x) (string-append "preval[" (number->string (preval-id x)) "]"))
     ((primop-symbol? x) (primop-to-id x))
-    ((non-resvd-list? x)
-      (if (primop-symbol? (p-first x))
-        (string-append (tocstr (p-first x) inl) "("
-          (implode ", " (map (lambda (p) (tocstr p inl)) (tail x)))
-          ")")
-        (string-append "apply_single(" (tocstr (p-first x) inl) ", "
-          (tocstr (p-second x) inl)
-          ")")))))
+    ((non-resvd-list? x) (cstr-funcall x 0 inl))))
 
 (define (generate-externs)
   (apply string-append
@@ -645,22 +785,61 @@
           ";\n"))
       (table->list internal-primops))))
 
+(define (list-contains? l x)
+  (if (null? l)
+    false
+    (if (eq? (car l) x)
+      true
+      (list-contains? (cdr l) x))))
+
+(define (accounting-varrefs l)
+  (let loop ((rem l) (done '()) (rv '()))
+    (if (null? rem)
+      (reverse rv)
+      (if (and (eq? (car (car rem)) 'INCREF) (varref? (cadr (car rem)))
+            (not (list-contains? done (varref-val (cadr (car rem))))))
+        (loop (cdr rem) (cons (varref-val (cadr (car rem))) done) rv)
+        (loop (cdr rem) done (cons (car rem) rv))))))
+
 (define (lambda-to-code x)
-  (string-append "    case " (number->string (car x)) ":\n"
-  (let ((c (cdr x)))
-    (string-append "      PUSH(" (tocstr c true) ");\n"))
-  "      break;\n"))
+  (let* ((c  (cdr x))
+         (tc (cstr-code c 0)))
+    (list
+      (caddr tc)
+      (cadr (cdddr tc))
+      (string-append "    case " (number->string (car x)) ":\n"
+          (string-append
+            (p-implode ""
+              (map (lambda (x) (itemstr x true "      ")) (accounting-varrefs (car tc))))
+            (if (tmpref? (cadr tc))
+              "      SCOPE_REMOVE();\n"
+              "")
+            "      PUSH("
+            (if (varref? (cadr tc))
+              (string-append "SCOPE_DOWN(" (itemstr (cadr tc) true "") ")")
+              (itemstr (cadr tc) true ""))
+            ");\n")))))
 
 (define (generate-lambdas-code)
-  (implode "\n" (map lambda-to-code (table->list internal-lambdas))))
+  (let ((stuff (map lambda-to-code (reverse (table->list internal-lambdas)))))
+    (list
+      (listmax (map car stuff))
+      (listmax (map cadr stuff))
+      (map caddr stuff))))
 
 (define (preval-to-code x)
-  (string-append "  preval[" (number->string (car x)) "] = "
-    (tocstr (cdr x) false)
-    ";\n"))
+  (let ((c (cstr-funcall (cdr x) 0)))
+    (list
+      (caddr c)
+      (length (cdr (flatten-args (cdr x))))
+      (p-implode ""  (map (lambda (x) (itemstr x false "  ")) (car c))))))
 
 (define (generate-prevals-code)
-  (implode "\n" (map preval-to-code (reverse (table->list internal-prevals)))))
+  (let ((stuff (map preval-to-code (reverse (table->list internal-prevals)))))
+    (list
+      (listmax (map car stuff))
+      (listmax (map cadr stuff))
+      (map caddr stuff))))
 
 ;; A bit hacky here, use reverse and hope that's the right order instead of sorting it...
 (define (generate-arity-values)
@@ -680,8 +859,6 @@ int main (void) { return EXIT_SUCCESS; }
 "
 (generate-externs)
 "
-static smooth preval[" (number->string internal-prevals-id) "];
-
 
 /*
  * Module optimisation definitions will allow static memory to be defined here
@@ -692,63 +869,57 @@ static smooth preval[" (number->string internal-prevals-id) "];
 /* Allocate some memory which we can shadow to use as ID addresses for our lambda tags. */
 #define SMOOTH_LAMBDAS_LENGTH " (number->string internal-lambdas-id) "
 
-const smooth_size smooth_lambdas_length = SMOOTH_LAMBDAS_LENGTH;
+smooth_size smooth_lambdas_length = SMOOTH_LAMBDAS_LENGTH;
 
 static const smooth_size smooth_lambda_sizes[SMOOTH_LAMBDAS_LENGTH] = {
   " (generate-arity-values) "
 };
 
 
-static smooth apply_single (smooth f, smooth v) {
-  return APPLY(f, &v, 1);
-}
-
-static smooth closure_single (smooth lam, smooth local) {
-  return CLOSURE_CREATE(lam, 1, &local, 1, (smooth) NULL);
-}
-
 #ifdef NATIVE_STACK
-smooth smooth_execute (smooth pc, smooth self, smooth* locals, smooth_size numlocals) {
+smooth smooth_execute (smooth pc, smooth self, smooth* args, smooth_size numlocals) {
 #else
 void smooth_execute (smooth pc) {
 #endif
-
-#ifndef NATIVE_STACK
-  /* we need to to extract the args from args and put them onto our own stack. */
-  smooth self;
-  smooth local[MAX_NUM_LOCALS];
-  smooth_size numlocals
-#endif
+"
+(let ((lc (generate-lambdas-code)))
+  (string-append
+"
+"
+(if (zero? (cadr lc)) ""
+  (string-append
+"  smooth locals[" (number->string (cadr lc)) "];"
+))
+"
+#ifdef NATIVE_STACK
+"
+(if (zero? (car lc)) ""
+  (string-append
+"  smooth tmp[" (number->string (car lc)) "];"
+))
+"
   int i;
-  /*
-   * TODO: This will be used to hold function body working locals.
-   * It will have enough space for the max number of tmp's used
-   * by any one lambda
-   */
-  smooth tmp[1];
-
-#ifndef NATIVE_STACK
-push_jump:
-
-  /* TODO: change code so these are accessed directly on stack */
-  self      = POP();
-  numlocals = POP();
-  locals    = POP();
-  i         = POP();
-  tmp       = POP();
 #endif
 
 jump:
   switch (pc) {
 "
-(generate-lambdas-code)
+(implode "\n" (caddr lc))
 "  }
-
+"
+))
+"
   /* This will not happen but helps keep the compiler happy */
   return 0;
 }
 
 int main (int argc, char** argv) {
+
+"
+(let ((p (generate-prevals-code)))
+  (string-append
+"  smooth locals[" (number->string (cadr p)) "];
+  smooth tmp[" (number->string (car p)) "];
 
   smooth_argc = argc;
   smooth_argv = argv;
@@ -756,7 +927,8 @@ int main (int argc, char** argv) {
   CORE_INIT(smooth_lambda_sizes);
 
 "
-(generate-prevals-code)
+  (implode "\n" (caddr p))
+))
 "
   return EXIT_SUCCESS;
 }

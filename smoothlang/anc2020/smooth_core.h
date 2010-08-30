@@ -16,10 +16,13 @@
 #define SET(a, b)       a = b
 #define REPEAT(c, n)    for (i = (n); i > 0; --i) { c; }
 
-#define VARIABLE_LOOKUP(n) ((n) < numlocals ? locals[n] : CLOSURE_LOOKUP(self, (n) - numlocals))
+#define VARIABLE_LOOKUP(n) ((n) < numlocals ? args[n] : CLOSURE_LOOKUP(self, (n) - numlocals))
 
 #define LAMBDA(x)   smooth_lambda(x)
 #define UNLAMBDA(x) smooth_unlambda(x)
+
+#define SCOPE_DOWN(x) smooth_gc_decref_scope(self, args, numlocals, x)
+#define SCOPE_REMOVE() smooth_gc_remove_scope(self, args, numlocals)
 
 
 /* These are not used at all when using native stack */
@@ -52,6 +55,8 @@
 #define UNBOX(x)                  smooth_unbox(x)
 #endif
 
+#define INCREF(x) smooth_gc_incref(x)
+
 
 /**********************************/
 
@@ -78,12 +83,17 @@ extern "C" {
   smooth smooth_lambda   (smooth x);
   smooth smooth_unlambda (smooth x);
 
-  void smooth_call (smooth x);
+  void   smooth_call (smooth x);
 
-  void smooth_stack_push (smooth x);
+  void   smooth_stack_push (smooth x);
   smooth smooth_stack_pop (void);
 
-  void smooth_core_init (const smooth_size* lambda_sizes);
+  void   smooth_core_init (const smooth_size* lambda_sizes);
+
+  smooth smooth_gc_decref_scope (smooth closure, smooth* locals, smooth_size numlocals, smooth rv);
+  void   smooth_gc_remove_scope (smooth closure, smooth* locals, smooth_size numlocals);
+
+  void   smooth_gc_incref (smooth p);
 
 #  ifdef __cplusplus
 }
