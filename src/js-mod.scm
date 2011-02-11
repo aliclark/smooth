@@ -449,7 +449,7 @@ case LAM_1_cont_1:
 
             if (!retnow)
             {
-                if (xct === 'object')
+                if (xct == 'object')
                 {
                     // this case means we have a closure,
                     // either an existing args thunk,
@@ -459,7 +459,7 @@ case LAM_1_cont_1:
                     xc = x.c;
                     xb = x.b;
 
-                    if (xb === null)
+                    if (!xb)
                     {
                         // We have a \"scope closure\" - needs an \"args\" buffer
 
@@ -473,7 +473,7 @@ case LAM_1_cont_1:
                         i   = xbn;
                         xbl = new Array(i);
 
-                        while (i !== xp)
+                        while (i != xp)
                         {
                             xbl[--i] = args[--bp];
                         }
@@ -495,7 +495,7 @@ case LAM_1_cont_1:
                         xbp = xb.p;
 
                         // copy on write check against args.body
-                        if (xp !== xbp)
+                        if (xp != xbp)
                         {
                             xbp = xp;
                             xbn = xb.n;
@@ -505,7 +505,7 @@ case LAM_1_cont_1:
                             xbl  = new Array(i);
                             copy = xb.l;
 
-                            while (i-- !== xbp)
+                            while (i-- != xbp)
                             {
                                 xbl[i] = copy[i];
                             }
@@ -528,7 +528,7 @@ case LAM_1_cont_1:
                         i = (framecount > xp) ? xp : framecount;
                         framecount -= i;
 
-                        while (i-- !== 0)
+                        while (i--)
                         {
                             xbl[--xp] = args[--bp];
                         }
@@ -544,16 +544,16 @@ case LAM_1_cont_1:
                     }
 
                     // we need more args to continue
-                    if (xp !== 0)
+                    if (xp)
                     {
-                        if (frameret === 0)
-                        {
-                            return x;
-                        }
-                        else
+                        if (frameret)
                         {
                             retnow = true;
                             xc = x;
+                        }
+                        else
+                        {
+                            return x;
                         }
                     }
 
@@ -566,18 +566,18 @@ case LAM_1_cont_1:
                 }
             }
 
-            if (retnow || (xct === 'number'))
+            if (retnow || (xct == 'number'))
             {
                 xbn = smoothLambdaSizes[xc];
 
                 // if we aren't a closure and lack args, create a thunk
-                if (!retnow && (x === null) && (framecount < xbn))
+                if (!retnow && !x && (framecount < xbn))
                 {
                     // take the args into a closure buffer
                     xbp = xbn;
                     xbl = new Array(xbp);
 
-                    while (bp !== framestart)
+                    while (bp != framestart)
                     {
                         xbl[--xbp] = args[--bp];
                     }
@@ -595,13 +595,13 @@ case LAM_1_cont_1:
                         p: xbp
                     };
 
-                    if (frameret === 0)
+                    if (frameret)
                     {
-                        return xc;
+                        retnow = true;
                     }
                     else
                     {
-                        retnow = true;
+                        return xc;
                     }
                 }
 
@@ -641,19 +641,19 @@ case LAM_1_cont_1:
             else
             {
                 // native call, one arg at a time (or with a closure)
-                xc = xc(x === null ? args[--bp] : x);
+                xc = xc(x ? x : args[--bp]);
                 --framecount;
             }
 
-            if (bp === framestart)
+            if (bp == framestart)
             {
-                if (frameret === 0)
+                if (frameret)
                 {
-                    return xc;
+                    retnow = true;
                 }
                 else
                 {
-                    retnow = true;
+                    return xc;
                 }
             }
 
@@ -681,7 +681,7 @@ case LAM_1_cont_1:
                 var len = inp.length, xp, xbl, i, j;
 
                 // A sanity check to make the API inductive
-                if (n === 0)
+                if (!n)
                 {
                     return xc;
                 }
@@ -743,7 +743,7 @@ case LAM_1_cont_1:
                 var n = inp.length, i = 0, j = n;
 
                 // A sanity check to make the API inductive
-                if (j === 0)
+                if (!j)
                 {
                     return xc;
                 }
