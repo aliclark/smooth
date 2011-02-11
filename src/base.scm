@@ -243,16 +243,16 @@
             (parse-read-symbol ls cs p)))))
       (peek-char p))))
 
-(define (parse-file-helper ls cs p)
+(define (parse-port-helper ls cs p)
   (let ((pn (parse-next ls cs p)))
     (if (parseobj-null? pn)
       p-null
-      (p-cons pn (parse-file-helper ls cs p)))))
+      (p-cons pn (parse-port-helper ls cs p)))))
 
 ;; This takes a file handle and returns the objects within,
 ;; exiting if it finds a syntax error.
-(define (parse-input-from-file p)
-  (let ((pp (parse-file-helper 0 0 p)))
+(define (parse-input-from-port p)
+  (let ((pp (parse-port-helper 0 0 p)))
     (if (p-null? pp)
       (parseobj-mk 0 0 pp 0 0)
       (parseobj-mk 0 0 pp (parseobj-le (p-last pp)) (parseobj-ce (p-last pp))))))
@@ -309,7 +309,7 @@
 
 (define (output-parse-object h x) (display (parse-object-string x) h))
 
-(define (parse-output-to-file h p)
+(define (parse-output-to-port h p)
   (p-map
     (lambda (x) (begin (output-parse-object h x) (newline h)))
     p))

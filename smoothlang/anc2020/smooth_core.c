@@ -70,14 +70,14 @@
 #endif
 
 /*
- * If using RTS_STATIC, the compiler implementation does not need to
+ * If using SMOOTH_RTS_STATIC, the compiler implementation does not need to
  * preserve an ABI between the generated C code and the RTS -
  * it may provide RTS definitions as macros which are burnt into the program code at compile time.
  * This allows the code to run closer to the metal,
  * but at the expense of the ability to switch out run time engine after the app has been compiled
  */
 
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 #endif
 
 /*
@@ -93,7 +93,7 @@
  *
  * In other words, Know What You Are Doing when setting this option.
  */
-#ifdef NATIVE_STACK
+#ifdef SMOOTH_NATIVE_STACK
 #endif
 
 /* OLD NOTES ON IMPLEMENTATION. NOTE THAT THREADING IS NO LONGER BEING CONSIDERED.
@@ -193,8 +193,13 @@ since a call may be made from within another call.
 
  */
 
+#ifndef SMOOTH_NO_LIBS
 #include <stdlib.h> /* size_t, EXIT_FAILURE, NULL, exit, malloc, realloc, free */
 #include <stdio.h> /* perror */
+#else
+typedef unsigned int size_t;
+typedef int FILE;
+#endif
 
 #include "smoothlang/anc2020/smooth_core.h"
 
@@ -204,7 +209,6 @@ since a call may be made from within another call.
 #else
 #  define TRUE  1
 #  define FALSE 0
-typedef byte bool;
 #endif
 
 /*---------------------------------------------------------------------------*/
@@ -213,28 +217,58 @@ int smooth_argc;
 char** smooth_argv;
 
 /*---------------------------------------------------------------------------*/
+/****************************** NO LIBS **************************************/
+
+#ifdef SMOOTH_NO_LIBS
+
+static void layers_free (void* p) {
+
+}
+
+#define layers_fputs(x,y)   (void)0 /*fputs(x,y)*/
+#define layers_fputc(x,y)   (void)0 /*fputc(x,y)*/
+#define layers_printf(x,y)  (void)0 /*printf(x,y)*/
+#define layers_exit(x)      (void)0 /*exit(s)*/
+#define layers_malloc(x)    NULL    /*malloc(s)*/
+#define layers_realloc(x,y) x       /*realloc(s)*/
+#define layers_free(x)      (void)0 /*free(s)*/
+
+#else
+
+#define layers_stderr  stderr
+#define layers_fputs   fputs
+#define layers_fputc   fputc
+#define layers_printf  printf
+#define layers_exit    exit
+#define layers_malloc  malloc
+#define layers_realloc realloc
+#define layers_free    free
+
+#endif
+
+/*---------------------------------------------------------------------------*/
 /************************** MEMORY ALLOCATION ********************************/
 
 static void die_message (const char* s) {
-  fprintf(stderr, "%s\n", s);
-  exit(EXIT_FAILURE);
+  layers_fputs(s,    layers_stderr);
+  layers_fputc('\n', layers_stderr);
+  layers_exit(EXIT_FAILURE);
 }
 
 static void memory_ensure (void* p, const char* s) {
   if (!p) {
-    perror(s);
-    exit(EXIT_FAILURE);
+    die_message(s);
   }
 }
 
 static void* memory_ensure_alloc (size_t sz, const char* s) {
-  void* a = malloc(sz);
+  void* a = layers_malloc(sz);
   memory_ensure(a, s);
   return a;
 }
 
 static void* memory_ensure_realloc (void* p, size_t sz, const char* s) {
-  void* a = realloc(p, sz);
+  void* a = layers_realloc(p, sz);
   memory_ensure(a, s);
   return a;
 }
@@ -283,8 +317,8 @@ static void* realloc_array_get (realloc_array* ra, size_t index) {
 }
 
 static void realloc_array_free (realloc_array* ra) {
-  free(ra->array);
-  free(ra);
+  layers_free(ra->array);
+  layers_free(ra);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -352,7 +386,7 @@ static bool realloc_stack_null (realloc_stack* rs) {
 
 static void realloc_stack_free (realloc_stack* rs) {
   realloc_array_free(rs->ra);
-  free(rs);
+  layers_free(rs);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -379,7 +413,7 @@ static linked_list* linked_list_tail (linked_list* list) {
 }
 
 static void linked_list_free_head (linked_list* l) {
-  free(l);
+  layers_free(l);
 }
 
 static linked_list* linked_list_tail_free (linked_list* l) {
@@ -441,8 +475,8 @@ static linked_array *linked_array_allocate (size_t data_size, size_t length) {
 }
 
 static void linked_array_free_section (linked_array_section* h) {
-  free(h->array);
-  free(h);
+  layers_free(h->array);
+  layers_free(h);
 }
 
 static void linked_array_free_head (linked_array *list) {
@@ -541,7 +575,7 @@ static bool growable_freelist_has (growable_freelist* ls, void* addr) {
 static void growable_freelist_free (growable_freelist* ls) {
   realloc_stack_free(ls->fl);
   linked_array_free(ls->la);
-  free(ls);
+  layers_free(ls);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -612,7 +646,7 @@ static void growable_table_remove (growable_table* gt, size_t key) {
   linked_list*  r  = *bp;
 
   if (r) {
-    free(linked_list_head(r));
+    layers_free(linked_list_head(r));
     *bp = linked_list_tail_free(r);
   }
 }
@@ -620,7 +654,7 @@ static void growable_table_remove (growable_table* gt, size_t key) {
 static void growable_table_free (growable_table* gt) {
   size_t i, len = gt->size;
   for (i = 0; i < len; ++i) {
-    linked_list_map_free(*((linked_list**) realloc_array_get(gt, i)), free);
+    linked_list_map_free(*((linked_list**) realloc_array_get(gt, i)), layers_free);
   }
   realloc_array_free(gt);
 }
@@ -650,14 +684,14 @@ static const smooth_size* lambda_sizes;
 
 
 
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 static
 #endif
 smooth smooth_lambda (smooth x) {
   return (smooth) (x + lambda_sizes);
 }
 
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 static
 #endif
 smooth smooth_unlambda (smooth x) {
@@ -674,28 +708,28 @@ smooth smooth_unlambda (smooth x) {
  */
 #if 0
 
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 static smooth box (smooth x) {
 #else
 smooth smooth_box (smooth x) {
 #endif
    return x;
 }
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 smooth smooth_box (smooth x) {
   return box(x);
 }
 #endif
 
 
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 static smooth unbox (smooth x) {
 #else
 smooth smooth_unbox (smooth x) {
 #endif
    return x;
 }
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 smooth smooth_unbox (smooth x) {
   return unbox(x);
 }
@@ -706,7 +740,7 @@ smooth smooth_unbox (smooth x) {
 /*---------------------------------------------------------------------------*/
 /******************************** STACK **************************************/
 
-#ifndef NATIVE_STACK
+#ifndef SMOOTH_NATIVE_STACK
 
 #ifdef STACK_STATIC
 
@@ -728,7 +762,7 @@ static void stack_allocate (void) {
 }
 
 
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 static
 #endif
 void smooth_stack_push (smooth x) {
@@ -745,7 +779,7 @@ void smooth_stack_push (smooth x) {
 }
 
 
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 static
 #endif
 smooth smooth_stack_pop (void) {
@@ -769,7 +803,7 @@ static void stack_free (void) {
 #endif
 }
 
-#endif /* NATIVE_STACK */
+#endif /* SMOOTH_NATIVE_STACK */
 
 /*---------------------------------------------------------------------------*/
 /********************************* CALL REGISTER *****************************/
@@ -870,6 +904,10 @@ void smooth_gc_register (smooth ptr, void (*freeptr)(smooth)) {
 void smooth_gc_incref (smooth ptr) {
   gc_entry* entry = gc_table_get(ptr);
   ++entry->refcount;
+#ifdef DEBUG_PRINT_REFS
+  layers_printf("incref(%d) to ", ptr);
+  layers_printf("%d\n", entry->refcount);
+#endif
 }
 
 void smooth_gc_decref (smooth ptr) {
@@ -878,6 +916,15 @@ void smooth_gc_decref (smooth ptr) {
   linked_list* freeptrs;
 
   entry = (gc_entry*) growable_table_get(gc_table, ptr);
+
+#ifdef DEBUG_PRINT_REFS
+  if (entry) {
+    layers_printf("decref(%d) to ", ptr);
+    layers_printf("%d\n", entry->refcount - 1);
+  } else {
+    layers_printf("decref(%d) not found\n", ptr);
+  }
+#endif
 
   if (entry && (--(entry->refcount) == 0)) {
     freeptrs = entry->freeptrs;
@@ -898,7 +945,7 @@ static void gc_table_free (void) {
   gc_table = NULL;
 }
 
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 static
 #endif
 smooth smooth_gc_decref_scope (smooth closure, smooth* locals, smooth_size numlocals, smooth rv) {
@@ -913,16 +960,19 @@ smooth smooth_gc_decref_scope (smooth closure, smooth* locals, smooth_size numlo
     smooth_gc_decref(locals[i]);
   }
 
-  /*
-   * If it hasn't been found yet, it was definitely in the closure locals.
-   * The free handler for closure is going to decref the rv when we free the closure,
-   * so we have to incref rv first.
-   * To do it any other way would require lots of meddling I think.
-   */
-  if (!done_rv) {
-    smooth_gc_incref(rv);
+  if (closure) {
+
+    /*
+     * If it hasn't been found yet, it was definitely in the closure locals.
+     * The free handler for closure is going to decref the rv when we free the closure,
+     * so we have to incref rv first.
+     * To do it any other way would require lots of meddling I think.
+     */
+    if (!done_rv) {
+      smooth_gc_incref(rv);
+    }
+    smooth_gc_decref(closure);
   }
-  smooth_gc_decref(closure);
 
   return rv;
 }
@@ -933,24 +983,13 @@ void smooth_gc_remove_scope (smooth closure, smooth* locals, smooth_size numloca
   for (i = 0; i < numlocals; ++i) {
     smooth_gc_decref(locals[i]);
   }
-  smooth_gc_decref(closure);
+  if (closure) {
+    smooth_gc_decref(closure);
+  }
 }
 
 /*---------------------------------------------------------------------------*/
 /******************************** CLOSURES ***********************************/
-
-typedef struct closure_body {
-  smooth* locals;
-  int     numlocals;
-  int     curpos;
-} closure_body;
-
-typedef struct closure {
-  smooth code;
-  int    curpos;
-  closure_body* body;
-  struct closure* parent; /* Allows access to more closed variables. */
-} closure;
 
 
 #ifdef CLOSURES_STATIC
@@ -1010,7 +1049,7 @@ static void closure_free (smooth addr) {
     smooth_gc_decref(c->body->locals[i]);
   }
 
-  free(c->body->locals);
+  layers_free(c->body->locals);
 
 #ifdef CLOSURES_BODY_STATIC
 #  ifdef CLOSURES_BODY_FREELIST_STATIC
@@ -1137,14 +1176,14 @@ static smooth closure_create_refd (smooth code, smooth_size n, smooth* args, smo
   return (smooth) rv;
 }
 
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 static smooth closure_create (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent) {
 #else
 smooth smooth_closure_create (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent) {
 #endif
   return closure_create_refd(code, n, args, args_count, parent, TRUE);
 }
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 smooth smooth_closure_create (smooth code, smooth_size n, smooth* args, smooth_size args_count, smooth parent) {
   return closure_create(code, n, args, args_count, parent);
 }
@@ -1155,8 +1194,10 @@ static smooth smooth_closure_create_internal (smooth code, smooth_size n, smooth
   return closure_create_refd(code, n, args, args_count, parent, FALSE);
 }
 
-
-static bool is_closure (smooth x) {
+#ifdef SMOOTH_RTS_STATIC
+static
+#endif
+bool smooth_is_closure (smooth x) {
   bool rv;
 #ifdef CLOSURES_STATIC
   rv = (x >= closures_memory) && (x < (closures_memory + CLOSURES_SIZE));
@@ -1167,7 +1208,7 @@ static bool is_closure (smooth x) {
 }
 
 
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 static smooth closure_lookup (smooth c, smooth_size i) {
 #else
 smooth smooth_closure_lookup (smooth c, smooth_size i) {
@@ -1182,7 +1223,7 @@ smooth smooth_closure_lookup (smooth c, smooth_size i) {
 
   return x->body->locals[i];
 }
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 smooth smooth_closure_lookup (smooth c, smooth_size i) {
   return closure_lookup(c, i);
 }
@@ -1218,7 +1259,10 @@ When you use SMOOTH_*_P, exactly one of the predicates will be true, no matter w
 In other words, don't use SMOOTH_*_P unless you know you have some kind of function/procedure.
 */
 
-static bool is_lambda (smooth x) {
+#ifdef SMOOTH_RTS_STATIC
+static
+#endif
+bool smooth_is_lambda (smooth x) {
   return ((((smooth_size*) x) >= lambda_sizes) &&
           (((smooth_size*) x) < (lambda_sizes + smooth_lambdas_length)));
 }
@@ -1239,7 +1283,7 @@ static bool is_lambda (smooth x) {
  */
 
 
-#ifdef NATIVE_STACK
+#ifdef SMOOTH_NATIVE_STACK
 
 smooth smooth_execute (smooth pc, smooth self, smooth* locals, smooth_size numlocals);
 
@@ -1258,7 +1302,7 @@ I'm not sure that we would ever want a closure as the code part.
 */
 static void call_closure (smooth x) {
   smooth code = ((closure*) x)->code;
-  if (is_lambda(code)) {
+  if (smooth_is_lambda(code)) {
     PUSH(x);
     smooth_execute(UNLAMBDA(code));
   } else {
@@ -1274,20 +1318,20 @@ static void call_primitive (smooth fn) {
   PUSH(rv);
 }
 
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 static
 #endif
 void smooth_call (smooth x) {
-  if (is_closure(x)) {
+  if (smooth_is_closure(x)) {
     call_closure(x);
-  } else if (is_lambda(x)) {
+  } else if (smooth_is_lambda(x)) {
     call_lambda(x);
   } else {
     call_primitive(x);
   }
 }
 
-#endif /* NATIVE_STACK */
+#endif /* SMOOTH_NATIVE_STACK */
 
 /*---------------------------------------------------------------------------*/
 /********************************* APPLY *************************************/
@@ -1309,7 +1353,7 @@ Warning: it is not this simple.
 In reality we need chains so frames so that a smooth_apply within a smooth_apply
 Does not leak data references.
 */
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 static smooth apply (smooth x, smooth* args, smooth_size n) {
 #else
 smooth smooth_apply (smooth x, smooth* args, smooth_size n) {
@@ -1321,20 +1365,21 @@ smooth smooth_apply (smooth x, smooth* args, smooth_size n) {
   smooth code;
   smooth rv;
   int i;
-#ifndef NATIVE_STACK
+  int bleft;
+#ifndef SMOOTH_NATIVE_STACK
   int j;
 #endif
 
-/* If doing tail call on NATIVE_STACK, we jump here to save frame space */
+/* If doing tail call on SMOOTH_NATIVE_STACK, we jump here to save frame space */
 jump:
   xc   = NULL;
   i    = 0;
   code = x;
-#ifndef NATIVE_STACK
+#ifndef SMOOTH_NATIVE_STACK
   j    = 0;
 #endif
 
-  if (is_closure(x)) {
+  if (smooth_is_closure(x)) {
 
     xc = (closure*) x;
 
@@ -1347,7 +1392,10 @@ jump:
       }
 
       /* now copy in from args until we hit the limit or run out of args. */
-      for (i = 0; (i < n) && (xc->body->curpos != xc->body->numlocals); ++i) {
+      bleft = xc->body->numlocals - xc->body->curpos;
+      bleft = bleft < n ? bleft : n;
+
+      for (; i < bleft; ++i) {
         xc->body->locals[xc->body->curpos++] = args[i];
       }
 
@@ -1371,17 +1419,17 @@ jump:
 
   }
 
-  if (is_lambda(code)) {
+  if (smooth_is_lambda(code)) {
 
     argsused = *((smooth_size*) code);
 
     /* if we're not quite there, we create a closure instead. */
-    if (is_lambda(x) && (n < argsused)) {
+    if (smooth_is_lambda(x) && (n < argsused)) {
       return smooth_closure_create_internal(code, argsused, args, n, (smooth) xc);
     }
 
-#ifdef NATIVE_STACK
-    rv = smooth_execute(UNLAMBDA(code), (smooth) xc, args, argsused);
+#ifdef SMOOTH_NATIVE_STACK
+    rv = smooth_execute(smooth_unlambda(code), (smooth) xc, args + i, argsused - i);
 #else
     for (j = argsused - 1; j >= i; --j) {
       PUSH(args[j]);
@@ -1389,7 +1437,7 @@ jump:
     PUSH(argsused - i);
 
     PUSH(xc);
-    smooth_execute(UNLAMBDA(code));
+    smooth_execute(smooth_unlambda(code));
     rv = POP();
 #endif
   } else {
@@ -1410,22 +1458,42 @@ jump:
   goto jump;
 
 }
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 smooth smooth_apply (smooth x, smooth* args, smooth_size n) {
   return apply(x, args, n);
+}
+#endif
+
+#ifdef SMOOTH_RTS_STATIC
+static
+#endif
+smooth* smooth_localsp_get (smooth f, smooth_size n, smooth* locals, smooth* jmps) {
+  return (smooth_is_lambda(f) && (n == (*((smooth_size*) f)))) ||
+    (smooth_is_closure(f) &&
+     (n == (((closure*) f)->body->numlocals - ((closure*) f)->curpos))) ?
+    jmps :
+    locals;
+}
+
+#ifndef SMOOTH_INLINE_VARIABLE_LOOKUP
+#ifdef SMOOTH_RTS_STATIC
+static
+#endif
+smooth smooth_variable_lookup (smooth self, smooth* args, smooth_size numlocals, smooth_size n) {
+  return (numlocals > n ? args[numlocals - (n + 1)] : CLOSURE_LOOKUP(self, ((closure*) self)->body->numlocals - (numlocals + n + 1)));
 }
 #endif
 
 /*---------------------------------------------------------------------------*/
 /********************************* INIT **************************************/
 
-#ifdef RTS_STATIC
+#ifdef SMOOTH_RTS_STATIC
 static
 #endif
 void smooth_core_init (const smooth_size* ls) {
   lambda_sizes = ls;
 
-#ifndef NATIVE_STACK
+#ifndef SMOOTH_NATIVE_STACK
   stack_allocate();
 #endif
   call_register_allocate();
@@ -1434,7 +1502,7 @@ void smooth_core_init (const smooth_size* ls) {
 }
 
 static void smooth_core_free (void) {
-#ifndef NATIVE_STACK
+#ifndef SMOOTH_NATIVE_STACK
   stack_free();
 #endif
   call_register_free();

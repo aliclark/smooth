@@ -16,6 +16,16 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*
+ * TODO: non-blocking versions of cfgetc.
+ * This would use some kind of queue of callback functions,
+ * and some actions_running count which tells us how many chars are wanted.
+ * Something works in a thread of other in the background to get the chars,
+ * then when they are found and the event checker is next run,
+ * the initially supplied callback is dequeued and called
+ * with the char and RealWorld value as arguments one and two.
+ */
+
 #include "smoothlang/anc2020/smooth.h"
 
 #include <stdio.h> /* Needed for definition of typedef FILE or stdin,stdout */
@@ -60,5 +70,64 @@ smooth smoothlang_anc2020_iochar__cfgetc (smooth s, smooth z) {
  * we might be able to replace consequetive cfputc_opt calls with this. */
 smooth smoothlang_anc2020_iochar__cfputs_opt (smooth x, smooth s) {
   return fputs((char*) x, (FILE*) s);
+}
+
+
+/*
+ * This would be a setup of maximum 8 streams in use at a time,
+ * still need to map streams pointers onto those numbers though.
+ */
+static int acfgetc_running_count[8] = 0;
+static int acfgetc_result[8]        = 0;
+
+static void acfgetc_thread_start (smooth s) {
+  ++acfgetc_running_count[s];
+
+  if (acfgetc_running_count[s] == 1) {
+    // we need to whir up the char getting process.
+  }
+}
+
+static void acfgetc_thread_got (smooth s, int c) {
+
+  --acfgetc_running_count[s];
+
+  if (acfgetc_running_count[s] == 0) {
+    // we need to stop running now
+  }
+
+  // we will most definitely need a buffer to store these.
+  acfgetc_result[s] = c;
+  acfgetc_has_result[s] = 1;
+}
+
+static int acfgetc_get_result (smooth s) {
+  return acfgetc_result[s];
+}
+
+
+
+static int acfgetc_has_result[8] = 0;
+
+smooth smoothlang_anc2020_iochar__acfgetc_try_get (smooth s, smooth z) {
+
+  if (!acfgetc_has_result[s]) {
+    // nothing yet :(
+    return iocons(-2, z); // need to come up with some kind of error value, -2 maybe?
+  }
+  acfgetc_has_result[s] = 0;
+
+  // the thread or process itself manages acfgetc_running_count values
+
+  return iocons(acfgetc_get_result(s), z);
+
+}
+
+smooth smoothlang_anc2020_iochar__acfgetc (smooth s, smooth z) {
+
+  // the thread or process itself manages acfgetc_running_count values
+  acfgetc_thread_start(s);
+
+  return iocons(0, z);
 }
 

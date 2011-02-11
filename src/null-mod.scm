@@ -23,18 +23,13 @@
 
 (define (start)
 
-  (parse-output-to-file (current-output-port)
+  (parse-output-to-port (current-output-port)
 
     (parse-phase-null
 
       (parse-strip-meta
         (parse-check-errors (current-error-port)
-          (parse-input-from-file (current-input-port)))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Init
-
-(start)
+          (parse-input-from-port (current-input-port)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

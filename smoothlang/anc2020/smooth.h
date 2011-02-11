@@ -19,8 +19,21 @@
 #define SMOOTH__H
 
 
+#ifdef NO_LIBS
+
+typedef long int smooth;
+
+#else
+
 #include <stdint.h> /* intptr_t */
 
+/*
+ * intptr_t is pretty much the only valid option here, and if not available,
+ * would recommend typedef'ing intptr_t for your particular platform.
+ */
+typedef intptr_t smooth;
+
+#endif
 
 /*
  * You should assume that the "smooth" type is large enough to hold a pointer,
@@ -46,12 +59,6 @@
  * or a different runtime, it is recommended to implement a more abstracted method of access.
  */
 
-
-/*
- * intptr_t is pretty much the only valid option here, and if not available,
- * would recommend typedef'ing intptr_t for your particular platform.
- */
-typedef intptr_t smooth;
 
 /*
  * This could be anything of many different types, with "unsigned int"

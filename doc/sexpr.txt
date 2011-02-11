@@ -1,0 +1,43 @@
+
+
+CHARACTER SEQUENCES
+
+The file format recognised is a simple list and symbol.
+
+The open list symbol is "(" minus quotes
+The close list symbol is ")" minus quotes
+
+The item separator is any combination of space, newline and/or tab
+
+All other characters sequence up to form symbols.
+
+The parser may *optionally* provide a configuration option to change any of the separator or whitespace settings,
+but it is never required to, and must default to the above behaviour
+
+
+INTERNAL SYMBOLS
+
+An internal symbol is a special sequence of characters that would otherwise form an error case,
+but which can be accepted as information to the parser.
+
+An internal symbol takes the form (() internal) where "internal" is the name of an internal symbol.
+
+
+FINAL DATA FORMAT
+
+There is only one very restricted usage of internal symbols that is standard for smooth.
+
+This is a list of the form ((() lambda) X E)
+
+where the head of the list is the internal symbol (() lambda)
+X can be replaced only with a single normal symbol, and not a list,
+and E can be replaced by any list or symbol that is not or does not contain the empty list,
+and can itself contain the above lambda expression.
+(except where used by an internal symbol or a list which has an internal symbol at its head)
+
+Such a final data format must only contain one expression of the above form at its top level
+
+
+PROXY PASSES
+
+Intermediate stages (those which output in the format described by this document) 
