@@ -66,9 +66,9 @@
                             // pushing a new frame as opposed to not... seems like overkill here...
                             xc = " (itemstr- (cadr x) "" true) "
 
-                            xct = typeof xc;
+                            xct = xc.constructor;
 
-                            if (xct === 'object')
+                            if (xct === Object)
                             {
                                 x   = xc;
                                 xc  = x.c;
@@ -80,7 +80,7 @@
                             else
                             {
                                 x = null;
-                                copy = ((xct === 'number') && (smoothLambdaSizes[xc] === " (number->string (cadddr x)) "));
+                                copy = ((xct === Number) && (smoothLambdaSizes[xc] === " (number->string (cadddr x)) "));
                             }
 
                             if ((x !== null) && copy)
@@ -343,7 +343,6 @@
  */
 var smooth = (function ()
 {
-
     'use strict';
 
     var space,
@@ -433,23 +432,25 @@ case LAM_1_cont_1:
          * make it easier to read the less expressive coding.
          */
 
-        var x, xct, xp, xb, xbp, xbn, xbl, copy, i;
+        var x, xc, xct, xp, xb, xbp, xbn, xbl, copy, i,
 
-        var framestart = retstack[--rbp];
-        var frameret   = retstack[--rbp];
-        var framecount = bp - framestart;
+            framestart = retstack[--rbp],
 
-        // going into retMode means that an inner function call is going into return,
-        // therefore we want to quickly make it back into the smooth code switch
-        var retnow = false;
+            // if frameret is a >=1, it is the next label to jump to, if 0, return JS
+            frameret   = retstack[--rbp],
+            framecount = bp - framestart,
+
+            // going into retMode means that an inner function call is going into return,
+            // therefore we want to quickly make it back into the smooth code switch
+            retnow = false;
 
         while (true)
         {
-            xct = typeof xc;
+            xct = xc.constructor;
 
             if (!retnow)
             {
-                if (xct == 'object')
+                if (xct === Object)
                 {
                     // this case means we have a closure,
                     // either an existing args thunk,
@@ -473,7 +474,7 @@ case LAM_1_cont_1:
                         i   = xbn;
                         xbl = new Array(i);
 
-                        while (i != xp)
+                        while (i !== xp)
                         {
                             xbl[--i] = args[--bp];
                         }
@@ -495,7 +496,7 @@ case LAM_1_cont_1:
                         xbp = xb.p;
 
                         // copy on write check against args.body
-                        if (xp != xbp)
+                        if (xp !== xbp)
                         {
                             xbp = xp;
                             xbn = xb.n;
@@ -505,7 +506,7 @@ case LAM_1_cont_1:
                             xbl  = new Array(i);
                             copy = xb.l;
 
-                            while (i-- != xbp)
+                            while (i-- !== xbp)
                             {
                                 xbl[i] = copy[i];
                             }
@@ -558,7 +559,7 @@ case LAM_1_cont_1:
                     }
 
                     // we now have all args, so fall through to call the code
-                    xct = typeof xc;
+                    xct = xc.constructor;
                 }
                 else
                 {
@@ -566,7 +567,7 @@ case LAM_1_cont_1:
                 }
             }
 
-            if (retnow || (xct == 'number'))
+            if (retnow || (xct === Number))
             {
                 xbn = smoothLambdaSizes[xc];
 
@@ -577,7 +578,7 @@ case LAM_1_cont_1:
                     xbp = xbn;
                     xbl = new Array(xbp);
 
-                    while (bp != framestart)
+                    while (bp !== framestart)
                     {
                         xbl[--xbp] = args[--bp];
                     }
@@ -645,7 +646,7 @@ case LAM_1_cont_1:
                 --framecount;
             }
 
-            if (bp == framestart)
+            if (bp === framestart)
             {
                 if (frameret)
                 {
