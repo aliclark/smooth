@@ -72,6 +72,8 @@
 ; But with Smooth, there is a syntax error if internal symbols are used in the wrong place.
 ; ((()lambda) ((()lambda)) (()lambda))
 
+(load "gambcini.scm")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Library code
 
@@ -92,6 +94,8 @@
       (tail l))))
 
 (define (implode glue l) (implode- "" glue l))
+
+(define (filter f xs) (if (null? xs) '() (if (f (car xs)) (cons (car xs) (filter f (cdr xs))) (filter f (cdr xs)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Domain specific library code
