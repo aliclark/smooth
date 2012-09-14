@@ -42,6 +42,41 @@
 ; its code value will take
 ;
 
+;
+; we could consider each and every value as having its own type 
+; the only way i could see this playing in usefully is that we might
+; be able to then overlap the calling-into and the calling-out area.
+; so if
+; f x y = g y x
+;
+; normally we have
+; push y
+; push x
+; call f
+; ->
+; push arg[0]
+; push arg[1]
+; call g
+;
+; but maybe we could do
+;
+; push x
+; push y
+; call f
+; goto g
+
+; note that this is all about reducing the number of times the same data has to be swapped around
+; to match differing argument patterns
+; i guess this is a sort of register allocation problem on mapping stack variables to specific argument slots.
+; the idea is that we could use the hotspot idea from JIT's to see which sites tend to get which type of function
+; then on the fly we compile fast code for exactly those kind of calls.
+;
+; perhaps instead of moving things to the right position beforehand and then calling with a mapping 0->arg[0],1->arg[1],...
+; we could leave things where they are and call with the mapping 0->1,1->0, and allow the function to look up arg[1]
+; seems pretty crummy.
+
+
+
 (define (itemstr- x id suppress)
   (cond
     ((symbol? x) (symbol->string x))
@@ -112,6 +147,144 @@
           (string-append id (itemstr- (car x) id true) "(" (implode ", " (map (lambda (y) (itemstr- y "" true)) (cdr x)))
             (if suppress ")" ");\n")))))
     (else (pretty-print x))))
+
+
+(define (square x)
+  (* x x))
+
+(define (sumsquare x)
+  (+ (square x) (square x)))
+
+(define (f x)
+  (sumsquare x))
+
+(print (f 9))
+
+(define (c x) (lambda (y) x))
+(define (a x) (c x))
+(define (b x) ((a x) a))
+
+(b b)
+((a b) a)
+((c b) a)
+((lambda (y) b) a)
+b
+
+(b b)
+((a b) a)
+(c b a)
+b
+
+
+for this we need some kind of global args stack 
+
+[]
+[b]
+call b
+[a b]
+call a
+[a b]
+call c
+
+this suggests that we do not want to put things like local variables in there too
+
+[ 12 2 5 3 | 2 4 5 3 | 3 4 | ]
+
+The above shows what it is like to be executing the nested call of a nested call.
+So how to pass the argc value into the callee?
+Using a separate stack seems a bit like overkill and potentially bad for cache.
+We can now either pass the location of the first arg, or the number:
+
+[ 12 2 5 3 |0| 2 4 5 3 |5| 3 4 |10| ]
+or
+[ 12 2 5 3 |4| 2 4 5 3 |4| 3 4 |2| ]
+
+When we want to do a tail call, we pop off the argc, push more args, and add an updated argc.
+
+We also need both local variables, and return addresses:
+
+[ 12 2 5 3 *0* |0| 2 3 4 / 2 4 5 3 *32* |9| 9 / 3 4 *38* |16| 0 0 / ]
+
+The return address *n* always points to the location where the tree started,
+
+ie.
+((foo bar) baz)
+ ^ here (n = 0)
+or
+(foo (bar baz) bar)
+     ^ here (n = 23)
+
+It's quite possible that what we actually want is two entry points into the code table,
+one is for when we are about to call a function's code,
+the other is when we are returning to a label having just called a function's code.
+
+I'm not sure we even need "locals" do we?
+
+If not then we deal with inner calls by evaluating right to left, pushing as we go.
+
+x a b c d e f g = (y (a (b c d)) (e f) g)
+
+note that startcall is always initiated by the parent call
+(there may be more args on the stack used in `call y`)
+
+the model is currently confused because i am trying to have it align such that existing stack args
+can be left alone and new args fall into place above them ready for the call.
+
+the question then is what to do about local variable storage.
+perhaps it would help to have two stacks, one for locals and one for args?
+
+case start_x:
+
+// todo: entry work here, pop off some useful vars and put them in locals area.
+// the pertinent information we receive is the start of the args frame and where to return to
+
+  // stack begins with [ prearg1 arg2 nextpc argc=2 ]
+  // imagine that x only takes one arg, so the prearg1 is actually for the tail call
+  // quickly becomes [ prearg1 *arg3* *arg4* *arg5* nextpc argc=5 ]
+  // here nextpc and argc are being thought of as temporary locals.
+  // we then perform inner calls in the stack space beyond argc,
+  // and mv the return values into either arg3,4,or 5
+  argc   = stack[--ebp]
+  nextpc = stack[--ebp]
+  stack[ebp++] = g
+  ebp += 2
+  stack[ebp++] = nextpc
+  // 1 is number of args used by x itself
+  stack[ebp++] = argc + 2 // remove 1 arg, tail call with 3
+
+  stack[ebp++] = f
+  stack[ebp++] = finish_e
+  stack[ebp++] = 1
+  goto e
+  continue dispatch
+case finish_e:
+  stack[ebp-4] = eax
+  stack[ebp++] = d
+  stack[ebp++] = c
+  stack[ebp++] = finish_b
+  stack[ebp++] = 2
+  goto b
+  continue dispatch
+case finish_b:
+  stack[ebp++] = eax
+  stack[ebp++] = finish_a
+  stack[ebp++] = 1
+  goto a
+  continue dispatch
+case finish_a:
+  stack[ebp-3] = eax
+  goto y
+  continue dispatch
+
+
+if the call to y does not use up all args, the engine will keep calling until depleted.
+
+note that there is a difference between pc and x, the return value/current function
+
+do closure arguments have to be copied onto stack or can we reference directly?
+if we did reference the closure instead of copy its variables,
+we would not be able to take advantage of
+
 
 (define (itemstr x id) (itemstr- x id false))
 
@@ -287,6 +460,8 @@
 (define (incref-initials l) "")
 
 (define (preval-to-code x)
+(print (cdr x))
+(newline)
   (let ((c (cstr-funcall (cdr x) 0 false)))
     (list
       (caddr c)
@@ -296,7 +471,7 @@
         (p-implode ""  (map (lambda (x) (itemstr x "                ")) (car c)))))))
 
 (define (generate-prevals-code)
-  (let ((stuff (map preval-to-code (reverse (table->list internal-prevals)))))
+  (let ((stuff (map preval-to-code (filter (lambda (x) (not (lamref? x))) (reverse (table->list internal-prevals))))))
     (list
       (listmax (map car stuff))
       (listmax (map cadr stuff))
@@ -355,7 +530,9 @@ var smooth = (function ()
         retstack = new Array(128),
         rbp      = 0,
         smoothLambdaSizes = [
-            0, " (generate-arity-values) "
+            0, "
+(generate-arity-values)
+"
     ];
 
 //
@@ -412,7 +589,7 @@ case LAM_1_cont_1:
 
 //
 // [ locals | parameters | return address | saved BP | ? ]
-//                                                        \- SP
+//                                                        - SP
 // SP always points to the TOS.
 // when making a frame, we push BP, set BP=SP,
 // then set SP to the new TOS after the push.
