@@ -97,6 +97,13 @@
 
 (define (filter f xs) (if (null? xs) '() (if (f (car xs)) (cons (car xs) (filter f (cdr xs))) (filter f (cdr xs)))))
 
+(define (list-contains? xs x)
+  (if (null? xs)
+    #f
+    (if (eq? (car xs) x)
+      #t
+      (list-contains? (cdr xs) x))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Domain specific library code
 
@@ -261,6 +268,213 @@
       (parseobj-mk 0 0 pp 0 0)
       (parseobj-mk 0 0 pp (parseobj-le (p-last pp)) (parseobj-ce (p-last pp))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; This gives the start and length of each object
+;; in the original input stream
+;; Together with the file of origin we find see the lines involved.
+;;
+;; TODO: make parseobj a sort of assoc-list of properties
+;; whereby the source-offset and source-length properties
+;; are automatically filled in,
+;; and the source-file property can be filled in by "load" pass.
+;;
+;; TODO: need to read parseobjects with offset and length
+;; as integers, not symbols
+;; - however, since we can't guarantee type conversion for all properties
+;;  (or cba) may as well leave it as symbol?
+
+(define (number->symbol x) (string->symbol (number->string x)))
+
+(define (assoc-set l k v)
+  (if (null? l)
+    (list (list k v))
+    (let ((c (car l)))
+      (if (eq? (car c) k)
+        (cons (list k v) (cdr l))
+        (cons c (assoc-set (cdr l) k v))))))
+
+(define (assoc-ref l k nf)
+  (if (null? l)
+    nf
+    (let ((c (car l)))
+      (if (eq? (car c) k)
+        (cadr c)
+        (assoc-ref (cdr l) k nf)))))
+
+(define (parseobj-mk obj props) (list obj props))
+
+(define (parseobj-obj   p) (car p))
+(define (parseobj-props p) (cadr p))
+
+(define (parseobj-set p k v)
+  (if (not (symbol? k))
+    (begin (display 'bad-parseobj-key-type) '()) ; there is a problem
+    (parseobj-mk (parseobj-obj p) (assoc-set (parseobj-props p) k v))))
+
+(define (parseobj-ref p k nf)
+  (assoc-ref (parseobj-props p) k nf))
+
+(define (parseobj-src-start  p) (parseobj-ref p 'source-start  #f))
+(define (parseobj-src-length p) (parseobj-ref p 'source-length #f))
+
+(define (parseobj-create s l obj)
+  (parseobj-set (parseobj-set (parseobj-mk obj '())
+                  'source-start (number->symbol s)) 'source-length (number->symbol l)))
+
+(define (parseobj-conv lam x) (parseobj-mk (lam (parseobj-obj x)) (parseobj-props x)))
+(define (parseobj-convf lam) (lambda (x) (parseobj-conv lam x)))
+
+(define (parseobj-lambda? px)
+  (let ((x (parseobj-obj px)))
+    (and (list? x)
+      (= (length? x) 3)
+      (let ((items (map parseobj-obj x)))
+        (and (null? (car items))
+          (symbol? (cadr items))
+          ; todo: some sensible expression checking
+          )))))
+
+(define (parseobj-decspecial? px)
+  (let ((x (parseobj-obj px)))
+    (and (list? x)
+      (>= (length? x) 3)
+      (let ((items (map parseobj-obj x)))
+        (and (null? (car items))
+          (symbol? (cadr items))
+          (null? (p-last items)))))))
+
+(define (sexpr-decspecial? x)
+  (and (list? x) (>= (length? x) 3)
+    (null? (car x)) (symbol? (cadr x)) (null? (p-last x))))
+
+;; Returns a list of all decspecial symbols in this object's top level
+;; if a decspecial is defined multiple times this will have multiple
+;; entries for the decspecial
+(define (parseobj-decspecials px)
+  (let ((xs (parse-strip-meta px)))
+    (if (not (list? xs))
+      '()
+      (let loop ((rem xs) (rv '()))
+        (if (null? rem)
+          (reverse rv)
+          (if (sexpr-decspecial? (car rem))
+            (loop (cdr rem) (cons (sexpr-decspecial-name (car rem)) rv))
+            (loop (cdr rem) rv)))))))
+
+;; given a root object and symbol, is that symbol defined as a decspecial?
+(define (parseobj-has-decspecial? px d) (list-contains? (parseobj-decspecials px) d))
+
+;; If parseobj is a non-empty list, the head of that list
+(define (parseobj-head px nf)
+  (let ((o (parseobj-obj px)))
+    (if (and (list? o) (>= (length o) 1))
+      (car o)
+      nf)))
+
+(define (parseobj-has-head px d) (eq? (parseobj-has-head ps #f) d))
+
+;; list of all root objects which have a special at their head
+(define (parseobj-root-specials px)
+  (let ((obj (parseobj-obj px)))
+    (if (not (list? obj))
+      '()
+      (let ((sl (parseobj-decspecials px)))
+        (filter
+          (lambda (x)
+            (list-contains? sl (parseobj-obj (parseobj-head x))))
+          obj)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (is-whitespace? c)
+  (or (char=? c cspace) (or (char=? c cnewline) (char=? c ctab))))
+
+;; (list parseobj remcl len)
+(define (parse-read-list cl startn)
+  ; (cdr cl) moves past the open paren
+  (let loop ((remcl (cdr cl)) (len 1) (rv '()))
+    (if (null? remcl)
+      '() ; this is an error - no autoclosing
+
+      (let ((firstl (first-nonwhitespace-ch remcl)))
+
+        (if (null? firstl)
+          '() ; this really shouldnt happen
+
+          (let* ((fcl (car firstl))
+                 (fln (cadr firstl))
+                 (lnsofar (+ len fln)))
+
+          (if (parse-close-paren? (caar firstl))
+            (list (parseobj-create startn (+ lnsofar 1) (reverse rv))
+              (cdr fcl)
+              (+ lnsofar 1))
+
+            (let* ((readf (if (parse-open-paren? (car fcl)) parse-read-list parse-read-symbol))
+                   (pl (readf fcl (+ startn lnsofar))))
+                (loop (cadr pl) (+ lnsofar (caddr pl)) (cons (car pl) rv))))))))))
+
+;; (list parseobj remcl len)
+(define (parse-read-symbol cl startn)
+  (let loop ((remcl cl) (n 0) (rv '()))
+    (if (or (null? remcl) (parse-white-space? (car remcl)) (parse-paren? (car remcl)))
+      (list (parseobj-create startn n (p-list-to-p-symbol (reverse rv))) remcl n)
+      (loop (cdr remcl) (+ n 1) (cons (car remcl) rv)))))
+
+;; returns list starting with valid non-whspace-ch at head
+;; second element is the number of characters skipped
+(define (first-nonwhitespace-ch cl)
+  (let loop ((n 0) (remcl cl))
+    (if (null? remcl)
+      '()
+      (let ((c (car remcl)))
+        (if (is-whitespace? c)
+          (loop (+ n 1) (cdr remcl))
+          (list remcl n))))))
+
+;; returns (list parseobj remcl len)
+(define (read-charlist-obj cl startn)
+  (let ((c (car cl)))
+    (if (parse-open-paren? c)
+      (parse-read-list cl startn)
+      (if (parse-close-paren? c)
+        '() ; error list closed early
+        (parse-read-symbol cl startn)))))
+
+;;; TODO: use leadsp to return the whitespace gap count
+
+;; returns (list (list parseobj remcl len) leadsp)
+(define (read-charlist-next cl startn)
+  (let ((firstl (first-nonwhitespace-ch cl)))
+    (if (null? firstl)
+      '()
+      (list (read-charlist-obj (car firstl) (+ startn (cadr firstl))) (cadr firstl)))))
+
+;; returns parseobj
+;; parseobj = a single parseobj listing all objects in the file
+(define (read-charlist-as-parseobj cl)
+  (let loop ((allobjs '()) (remcl cl) (startn 0))
+    (let ((objremgot (read-charlist-next remcl startn)))
+      (if (null? objremgot)
+        (parseobj-create 0 (length cl) (reverse allobjs))
+        (let ((objrem (car objremgot))
+              (leadsp (cadr objremgot)))
+          (loop (cons (car objrem) allobjs) (cadr objrem) (+ startn (caddr objrem) leadsp)))))))
+
+(define (read-charlist-from-port p)
+  (let loop ((l '()))
+    (let ((c (read-char p)))
+      (if (eof-object? c)
+        (reverse l)
+        (loop (cons c l))))))
+
+(define (read-parseobj-from-port p)
+  (read-charlist-as-parseobj (read-charlist-from-port p)))
+
+(define (read-sexprs-from-port p)
+  (parse-strip-meta (read-parseobj-from-port p)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Parse tree error checking
 ;;;
@@ -284,7 +498,7 @@
 ;;; Thus we strip parseobj's out, leaving just the parseobj-val.
 
 (define (parse-strip-meta p)
-  (let ((v (parseobj-val p)))
+  (let ((v (parseobj-obj p)))
     (if (p-list? v)
       (p-map parse-strip-meta v)
       v)))
@@ -309,7 +523,11 @@
 (define (parse-object-string x)
   (if (p-list? x)
     (string-append "(" (p-implode " " (p-map parse-object-string x)) ")")
-    (p-symbol-string x)))
+    (if (number? x)
+      (number->string x)
+      (if (symbol? x)
+        (p-symbol-string x)
+        "-------UNKNOWN------"))))
 
 (define (output-parse-object h x) (display (parse-object-string x) h))
 
@@ -318,5 +536,7 @@
     (lambda (x) (begin (output-parse-object h x) (newline h)))
     p))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define (parse-output-to-port-literally h p) (display (parse-object-string p) h))
+(define (parse-output-to-port h p) (map (lambda (x) (parse-output-to-port-literally h x) (newline h)) p))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
