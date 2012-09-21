@@ -16,17 +16,12 @@
 (load "base.scm")
 
 ;;; merges file "foo"'s contents inito this one
-;;; could also be called "include"
+;;; this phase could also be called "include"
 ;;; (load "foo")
 
-;;; allows the definitions of "foo" to be used within this file
-;;; whilst not actually exposing the definitions outside
-;;; (import "mod")
-;;; for now import is not supported because it's harder to do
-
-;;; It is an error to import/load the same definition from two different files
-;;; We can perform all "load" operations, then fill in remaining symbols
-;;; from imports
+;;; This method of loading code is here for backwards
+;;; compatibility with Scheme.
+;;; Use the module system once it becomes implemented.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
