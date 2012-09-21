@@ -105,17 +105,17 @@
             (cadr a))
           props)))))
 
-;; The important thing is that if "(fn ...)" is has offset 33, length 15 in the source program,
+;; The important thing is that if "(lambda ...)" is has offset 33, length 15 in the source program,
 ;; the resulting "(lambda ...)" should have those properties (even if the source length would be different).
 ;; It would then be clear that this came from a macroexpansion.
 ;; We could even add our own metadata property, a stack trace of expansions:
-;; '(macexpansions ((0 (fn (x y) exp)) (1 (intermediate-macexp))))
+;; '(macexpansions ((0 (lambda (x y) exp)) (1 (intermediate-macexp))))
 ;; So if one macro expands to another and so on, we can see what macros were involved.
 ;; This may be overkill, since we can always reproduce this once we have identified the source location.
 ;;
-;; (fn (x ...) exp) -> (__lambda__ x (fn (...) exp))
-;; (fn ()      exp) -> exp
-(define (fn-macro args props)
+;; (lambda (x ...) exp) -> (__lambda__ x (lambda (...) exp))
+;; (lambda ()      exp) -> exp
+(define (lambda-macro args props)
   (let ((al (parseobj-obj (car args)))
          (ap (parseobj-props (car args))))
     (if (null? al)
@@ -123,12 +123,12 @@
       (parseobj-mk
         (list (macropobj '__lambda__) (car al)
           (macropobj
-            (list (macropobj 'fn) (parseobj-mk (cdr al) ap) (cadr args))))
+            (list (macropobj 'lambda) (parseobj-mk (cdr al) ap) (cadr args))))
         props))))
 
-;; FIXME: We must ensure both define and fn are visible
+;; FIXME: We must ensure both define and lambda are visible
 ;;
-;; (define (f ...) exp) -> (__define__ f (fn (...) exp))
+;; (define (f ...) exp) -> (__define__ f (lambda (...) exp))
 ;; (define f exp)       -> (__define__ f exp)
 (define (def-macro args props)
   (let ((v (parseobj-obj (car args)))
@@ -138,7 +138,7 @@
         (list (macropobj '__define__)
           (car v)
           (macropobj
-            (list (macropobj 'fn) (parseobj-mk (cdr v) vp) (cadr args))))
+            (list (macropobj 'lambda) (parseobj-mk (cdr v) vp) (cadr args))))
         (cons (macropobj '__define__) args))
       props)))
 
@@ -152,9 +152,9 @@
         (comment-macro args props))
       ((or (eq? mac 'load) (eq? mac 'decmacro) (eq? mac 'extern))
         (specialnym-macro (car x) args props))
-      ((eq? mac 'let)  (let-macro  args props))
-      ((eq? mac 'fn)   (fn-macro   args props))
-      ((eq? mac 'def)  (def-macro  args props))
+      ((eq? mac 'let)    (let-macro  args props))
+      ((eq? mac 'lambda) (lambda-macro   args props))
+      ((eq? mac 'define) (def-macro  args props))
       (#t (display 'macro-not-found)))))
 
 (define (ismacrosym? x)
@@ -166,8 +166,8 @@
       (eq? x 'extern)
       (eq? x 'list)
       (eq? x 'let)
-      (eq? x 'fn)
-      (eq? x 'def))))
+      (eq? x 'lambda)
+      (eq? x 'define))))
 
 (define (macexpand px)
   (let ((x (parseobj-obj px)))
