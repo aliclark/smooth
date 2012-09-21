@@ -325,6 +325,18 @@
 (define (parseobj-conv lam x) (parseobj-mk (lam (parseobj-obj x)) (parseobj-props x)))
 (define (parseobj-convf lam) (lambda (x) (parseobj-conv lam x)))
 
+(define (parseobj-sel-inner i lam x)
+  (if (= i 0)
+    (cons (lam (car x)) (cdr x))
+    (cons (car x) (parseobj-sel-inner (- i 1) lam (cdr x)))))
+
+(define (parseobj-sel i lam px)
+  (let ((x (parseobj-obj px)))
+    (if (list? x)
+      (if (<= (length x) i)
+        '() ; error
+        (parseobj-mk (parseobj-sel-inner i lam x) (parseobj-props px))))))
+
 (define (parseobj-lambda? px)
   (let ((x (parseobj-obj px)))
     (and (list? x)
@@ -384,6 +396,19 @@
           (lambda (x)
             (list-contains? sl (parseobj-obj (parseobj-head x))))
           obj)))))
+
+(define ensure-contains cons)
+
+(define (contains? l x)
+  (if (null? l) false (if (equal? (head l) x) true (contains? (tail l) x))))
+
+(define (reserved-form-type? px s ln)
+  (let ((x (parseobj-obj px)))
+    (and (list? x) (or (= ln 0) (= (length x) ln)) (eq? (parseobj-obj (car x)) s))))
+
+(define (lambda-expression? x) (reserved-form-type? x '__lambda__ 3))
+(define (lambda-expression-var x) (cadr (cadr x)))
+(define (lambda-expression-body x) (caddr x))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
