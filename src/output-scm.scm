@@ -16,6 +16,19 @@
 (load "base.scm")
 
 ;;; TODO:
+;;; 1) Grow Scheme and Smooth towards each other.
+;;;   > Implement more Scheme-like language features (pretty much done now).
+;;;   > Use a progressively simpler subset of Scheme in implementing the passes.
+;;; 2) Make/keep the compiler implementation reasonably performant.
+;;; 3) Improve the performance of the generated Scheme code (use betareduce especially).
+;;;
+;;; Once the above conditions are met, then it is sensible to
+;;; switch the implementation to being thought of as a Smooth program.
+;;; There is no point doing this if it is still very slow.
+;;;
+;;; 4) Start building out Smooth past Scheme - velcro, modules, macros
+;;;
+;;;
 ;;; A simple lambda to Scheme compiler
 ;;;
 ;;; Front-end pipe on *all* files first:
