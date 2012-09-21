@@ -15,19 +15,32 @@
 
 (load "base.scm")
 
-;;; This phase performs macro expansion
-;;; (expand macname [arg1 ...])
+;;; This phase performs basic macro expansion.
+;;; The current implementation is not very sophisticated and will eventually be replaced,
+;;; but serves the basic needs (let, def, list, etc) well enough.
+
+;; gensyms will be random - if they collide simply recompile
+;; Also, we can use parse metadata to indicate that a symbol is a gensym,
+;; and teach varexpand and co to know they mustn't shadow, or be shadowed.
+
+;; Current implementation:
+;; 1) Macros are implemented directly in this file
+;; 2) These can be used in the program after putting in (__decmacro__ themacroname)
+
+;; Eventual implementation:
+;; First class macros, with implementation directly in the source file:
+;; (__macro__ (__lambda x x))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; gensyms are random - if they collide simply recompile!
 
 (define (macropobj x) (parseobj-mk x '()))
 
 ;; This runs into the age-old problem of referring to the wrong 'cons and the wrong 'nil
 ;; when they are shadowed.
 ;; We need to be able to refer to these more absolutely,
-;; or even just copy their definitions into that position
+;; or even just copy their definitions into that position.
+;;
+;; The eventual implementation with first class macros should be able to solve this.
 ;;
 ;; FIXME: It is our responsibility to supply a definition
 ;; for cons and nil
@@ -42,7 +55,7 @@
         (macropobj (cons (macropobj 'list) (cdr args)))))
     props))
 
-;; (comment ...) -> (begin)
+;; (comment ...) -> (__begin__)
 (define (comment-macro args props)
   (parseobj-mk (list (macropobj '__begin__)) props))
 
@@ -53,7 +66,7 @@
           (syn (string->symbol (string-append "__" (symbol->string s) "__"))))
     (parseobj-mk (cons (parseobj-mk syn sp) args) props)))
 
-;; (let ((v x) ...) exp) -> ((lambda v (let (...) exp)) x)
+;; (let ((v x) ...) exp) -> ((__lambda__ v (let (...) exp)) x)
 ;; (let ()          exp) -> exp
 (define (let-macro args props)
   (let ((vs (parseobj-obj (car args)))
@@ -79,7 +92,7 @@
 ;; So if one macro expands to another and so on, we can see what macros were involved.
 ;; This may be overkill, since we can always reproduce this once we have identified the source location.
 ;;
-;; (fn (x ...) exp) -> (lambda x (fn (...) exp))
+;; (fn (x ...) exp) -> (__lambda__ x (fn (...) exp))
 ;; (fn ()      exp) -> exp
 (define (fn-macro args props)
   (let ((al (parseobj-obj (car args)))
@@ -94,8 +107,8 @@
 
 ;; FIXME: We must ensure both define and fn are visible
 ;;
-;; (def (f ...) exp) -> (define f (fn (...) exp))
-;; (def f exp)       -> (define f exp)
+;; (define (f ...) exp) -> (__define__ f (fn (...) exp))
+;; (define f exp)       -> (__define__ f exp)
 (define (def-macro args props)
   (let ((v (parseobj-obj (car args)))
          (vp (parseobj-props (car args))))
@@ -116,7 +129,7 @@
     (cond
       ((eq? mac 'comment)
         (comment-macro args props))
-      ((or (eq? mac 'load) (eq? mac 'decmacro) (eq? mac 'decextern))
+      ((or (eq? mac 'load) (eq? mac 'decmacro) (eq? mac 'extern))
         (specialnym-macro (car x) args props))
       ((eq? mac 'let)  (let-macro  args props))
       ((eq? mac 'fn)   (fn-macro   args props))
@@ -129,7 +142,7 @@
       (eq? x 'comment)
       (eq? x 'decmacro)
       (eq? x 'load)
-      (eq? x 'decextern)
+      (eq? x 'extern)
       (eq? x 'list)
       (eq? x 'let)
       (eq? x 'fn)
