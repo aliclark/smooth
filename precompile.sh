@@ -10,6 +10,5 @@ else
 fi
 
 for f in ../test/*.smc; do
-    ./runmod.scm sexpr-to-parseobj.scm <$f | ./runmod.scm macexpand.scm > `echo $f | sed s/\.smc$/\.smo/`;
+    ./runmod.scm comments.scm <$f | ./runmod.scm sexpr-to-parseobj.scm | ./runmod.scm macexpand.scm > `echo $f | sed s/\.smc$/\.smo/`;
 done
-
