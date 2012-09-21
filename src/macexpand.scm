@@ -19,17 +19,38 @@
 ;;; The current implementation is not very sophisticated and will eventually be replaced,
 ;;; but serves the basic needs (let, def, list, etc) well enough.
 
-;; gensyms will be random - if they collide simply recompile
-;; Also, we can use parse metadata to indicate that a symbol is a gensym,
-;; and teach varexpand and co to know they mustn't shadow, or be shadowed.
-
 ;; Current implementation:
 ;; 1) Macros are implemented directly in this file
 ;; 2) These can be used in the program after putting in (__decmacro__ themacroname)
 
-;; Eventual implementation:
+;; Eventual implementation (see module.scm):
 ;; First class macros, with implementation directly in the source file:
 ;; (__macro__ (__lambda x x))
+
+;; So, is it possible to have first class macros?
+;; Do we want them? If we receive them via lambda argument, that
+;; implies at least one enclosing lambda for which we cannot use a macro...
+;; Or if we receive a package of macros, we can't use those macros,
+;; to unpack the package.
+;;
+;; Perhaps it is best to say to that: create a standard pack of macros,
+;; and make their definitions automatically referencable in the source.
+;;
+;; It is essentially equivalent to the compiler accepting top-level macros.
+;;
+;; http://matt.might.net/articles/metacircular-evaluation-and-first-class-run-time-macros/meta-circ.scmx
+;; http://mainisusuallyafunction.blogspot.co.uk/2012/04/scheme-without-special-forms.html
+;; https://en.wikipedia.org/wiki/Fexpr
+;; https://en.wikipedia.org/wiki/Hygienic_macro
+;;
+;; Fexprs probably not a good idea. Or perhaps run-time macro type of things are allowed,
+;; just so long as they are completely evaluated at compile-time? <- seems a good idea
+;;
+;; http://w210.ub.uni-tuebingen.de/dbt/volltexte/2006/2423/pdf/diss.pdf
+
+;; gensyms will be random - if they collide simply recompile
+;; Also, we can use parse metadata to indicate that a symbol is a gensym,
+;; and teach varexpand and co to know they mustn't shadow, or be shadowed.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

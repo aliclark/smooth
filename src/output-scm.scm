@@ -16,24 +16,20 @@
 (load "base.scm")
 
 ;;; TODO:
-;;; * convert simplevars to parseobj
-;;; * convert simplescm to parseobj
-;;; * move all the old code out the way (including old base.scm functions)
-;;; * commit to repo!!!!
-
 ;;; A simple lambda to Scheme compiler
 ;;;
 ;;; Front-end pipe on *all* files first:
 ;;; UTF8 -> | comments | indentation | -> SEXPR -> | parseobj | expand | -> PARSEOBJ
 ;;;
 ;;; Back-end pipe on just the main code file:
-;;; PARSEOBJ -> | load | vars | betareduce | velcro | errsprint | output | -> SCHEME
+;;; PARSEOBJ -> | load | vars | dearitise | betareduce | velcro | errsprint | rearitise | output | -> SCHEME
 ;;;
 ;;; We like to run load first, because then there is
 ;;; no special behaviour given to this file over the included ones.
 ;;;
 ;;; It may be a good idea to make a cleverer "load" phase
 ;;; that knows how to run the front-end pipe on any input files it sees.
+;;; However, given that "load" will be replaced at some point, this is moot.
 ;;;
 ;;; It is definitely a good idea to make indentation reader itself return parseobjs,
 ;;; that way there is a direct mapping between raw source and output.
@@ -41,83 +37,27 @@
 ;;; leave everything else untouched.
 ;;;
 ;;; At the final pass the only top-level statements allowed are:
-;;; * (__extern__ VAR)
 ;;; * a single expression of form: (__start__ E)
-;;;   where E is one of (LAM, APP, VAR)
+;;;   where E is one of (LAM, APP, VAR, EXT)
 ;;;   LAM = (__lambda__ VAR E) where E can contain VAR
 ;;;   APP = (E E)
-;;;   VAR = VAR declared by an enclosing LAM, or by a (__extern__ VAR)
+;;;   VAR = VAR declared by an enclosing LAM
+;;;   EXT = (__extern__ someidentifier)
 
 ;; Useful symbols:
-;; __lambda__ __define__ __decmacro__ __load__ __begin__ __extern__
+;; __lambda__ __begin__ __extern__
+;;
+;; Useful for porting from Scheme, but deprecated:
+;; __define__ __decmacro__ __load__
+;;
+;; Will be useful soon:
+;; __import__ __macro__
 
 ;; Useful properties:
 ;; source-file source-start source-length
 
-;; We should make __lambda__ and __define__ complain if they see a __foo__ shaped variable
-
-;; I feel the direction we are heading in terms of code organisation,
-;; is for each file to contain a single expression.
-;;
-;; This expression first takes 0 or more arguments, which are "module" definition maps.
-;; The expression then returns a single "module" definition map.
-;;
-;; The configuration for which modules are put into the module arguments
-;; could be provided outside of the source, essentially dependency injection.
-;;
-;; Perhaps the arguments to these file lambdas don't even have to be
-;; "modules", they can just be whatever value is configured to be passed in.
-;;
-;; There could be multiple such lambdas per file.
-;;
-;; We can either come up with a way to uniquely name each,
-;; or we can wrap them in a sort of mega module which contains the sub modules,
-;; with the mega module being the only top-level lambda of the file.
-;;
-;; Personally I like the mega module idea.
-;;
-;; So now we are clear that we would each file to contain exactly one expression.
-;;
-;; Module imports should be provided as arguments to this expression.
-;; It would be possible for the expression to call a function, A, which
-;; returns the currect module to it, but then the problem is that A's
-;; definition is not visible, so this is in no way prettier.
-;;
-;; So now we have files which take other files as arguments.
-;; At the top, you have absolute primitives like Boolean
-;; which take no arguments at all.
-;;
-;; Pair, is implemented using just a boolean like interface:
-;; ("pair.smc" "boolean.smc") -> Pair
-;;
-;; Native functions are also passed in (perhaps with less fanfare).
-;; ("basicio.smc" "nativeio.c/stdin" "nativeio.c/stdout" "nativeio.c/fgetb" "nativeio.c/fputb")
-;;
-;; Things like macros are *defined* inside a lambda's definition, and can
-;; use the variables in the scope it lives in.
-;;
-;; I am still not sure how to return a macro, or otherwise make it visible to others.
-;;
-;; So, is it possible to have first class macros?
-;; Do we want them? If we receive them via lambda argument, that
-;; implies at least one enclosing lambda for which we cannot use a macro...
-;; Or if we receive a package of macros, we can't use those macros,
-;; to unpack the package.
-;;
-;; Perhaps it is best to say to that: create a standard pack of macros,
-;; and make their definitions automatically referencable in the source.
-;;
-;; It is essentially equivalent to the compiler accepting top-level macros.
-;;
-;; http://matt.might.net/articles/metacircular-evaluation-and-first-class-run-time-macros/meta-circ.scmx
-;; http://mainisusuallyafunction.blogspot.co.uk/2012/04/scheme-without-special-forms.html
-;; https://en.wikipedia.org/wiki/Fexpr
-;; https://en.wikipedia.org/wiki/Hygienic_macro
-;;
-;; Fexprs probably not a good idea. Or perhaps run-time macro type of things are allowed,
-;; just so long as they are completely evaluated at compile-time?
-;;
-;; http://w210.ub.uni-tuebingen.de/dbt/volltexte/2006/2423/pdf/diss.pdf
+;; We should make __lambda__ and __define__ complain if they are
+;; told to declare a __foo__ shaped variable
 
 (define (lambda-to-scm x)
   (if (not (= (length x) 3))
