@@ -1,26 +1,26 @@
 
-Discussion group (or please contact me directly on Github):
+Smooth is an untyped, strictly evaluating Lambda Calculus compiler, with S-expression syntax and macros.
 
-http://groups.google.com/group/smoothlang
+This project implements a compiler for Smooth.
 
 
-Notes:
+This language and compiler is different from others in that:
 
-The code is written for Gambit Scheme and Linux, but should not take much to port to
-other Schemes and Windows.
+* The compiler will reduce lambda expressions at compile time, effectively running as much of the program as possible before compiling the rest.
 
-The code at the moment is not complete and needs more work to be able to run full programs,
-but is put online for those interested.
+* The compiler will perform whole-program optimisation.
 
-This project is not vaporware - there will be a release, but neither am I in a rush,
-so things are being written such that major rewrites should not be necessary.
+* The compiler implementation is very modular, allowing language features to be easily implemented, changed or tested independently.
 
-The compiler itself will be up to the scratch of generating a decent executable pretty soon, ie. O(months),
-but it will take a while longer before the rest of the environment
-(packages, macros, read table, module code optimisations etc.)
-is up to scratch for writing code in the language.
+* The module system will be very, well, modular. It combines ideas from Java's dependency injection for module dependencies, and NodeJS/Javascript's notion of returning modules as first-class language objects.
 
-If you are interested in the project, please don't start hacking on it just yet,
-as I've got a number of things that are yet to be changed or implemented,
-and would not want to reject a good submission because it clashed with something else.
-Instead please give me a message and let me know if there's something you want to hack on.
+* A key priority of the language design is that the output of the compiler should be tiny, even potentially without a dependency on libc.
+
+
+Because lambda expressions are reduced at compile time:
+
+* It is possible to perform run-time type checking which actually runs at compile time, thus allowing the language to be it's own turing-complete type system.
+
+* There is no run-time cost to the module system in using first-class modules as inputs and outputs to other modules.
+
+* Macros are first-class during compile time. If any macros are unevaluated before run-time this will be flagged as an error. This means that macros can be supplied as dependencies to a module in the same way as normal functions can.
