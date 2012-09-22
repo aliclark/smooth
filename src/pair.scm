@@ -1,6 +1,6 @@
 
-(load "../smoothlang/anc2020/lambda.smc")
-(load "../smoothlang/anc2020/bool.smc")
+(load "lambda.scm")
+(load "bool.scm")
 
 (define pair            rsd3)
 (define fst             (applies true))

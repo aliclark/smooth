@@ -1,45 +1,52 @@
 
-; Why this isn't valid Smooth code:
-; * many reasons.
-; * implement an io monad before proceeding.
+; this will be removed before converting to smooth
+(load "schemeup.scm")
 
-(define (zero f x) x)
-(define (fifty-nine f x) (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f x))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+(load "lambda.scm")
+(load "bool.scm")
+(load "pair.scm")
+(load "numeral.scm")
+(load "list.scm")
+(load "basicio.scm")
 
-(define false (lambda (x) (lambda (y) y)))
-(define true  (lambda (x) (lambda (y) x)))
-(define semicolon #\;)
+(define (n59 f) (lambda (x) (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f x)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+
+(define semicolon n59)
+(define newlinech n10)
+
+(define (chareq? a) (lambda (b) ((= a) b)))
+
+; for the very time being we can get away with using 0 instead of -1 for EOF
+(define (iseof? x) (n0? x))
+
 (define comment-char semicolon) ; In the distant future this will be changed to #
-(define newlinech #\newline)
-(define stdin (current-input-port))
-(define stdout (current-output-port))
+; TODO: (define comment-char hash)
 
-(define (getc z) (read-char stdin))
-(define (putc c z) (write-char c stdout))
+(define Y
+  (lambda (f)
+    ((lambda (x) (f (lambda (v) ((x x) v))))
+     (lambda (x) (f (lambda (v) ((x x) v)))))))
 
-(define (chareq? a b) (eq? a b))
+(define read-comment
+  (Y
+    (lambda (read-comment)
+      ((>>= getc)
+        (lambda (c)
+          (((fif (iseof? c))
+             (return id))
+            (((fif ((chareq? c) newlinech))
+               ((>> (putc c)) read-normal))
+              read-comment)))))))
 
-; need to upgrade to negativeable church numerals first
-(define (iseof? x) (eof-object? x))
+(define read-normal
+  (Y
+    (lambda (read-normal)
+      ((>>= getc)
+        (lambda (c)
+          (((fif (iseof? c))
+             (return id))
+            (((fif ((chareq? c) comment-char))
+                 read-comment)
+              ((>> (putc c)) read-normal))))))))
 
-(define (read-comment z)
-  (let ((c (getc z)))
-    (if (iseof? c)
-      false ;done
-      (if (chareq? c newlinech)
-        (begin
-          (putc c z)
-          (read-normal z))
-        (read-comment z)))))
-
-(define (read-normal z)
-  (let ((c (getc z)))
-    (if (iseof? c)
-      false ;done
-      (if (chareq? c comment-char)
-        (read-comment z)
-        (begin
-          (putc c z)
-          (read-normal z))))))
-
-(define (start) (read-normal zero))
+(define (start) (read-normal n0))

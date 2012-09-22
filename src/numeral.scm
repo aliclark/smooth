@@ -1,6 +1,6 @@
 
-(load "../smoothlang/anc2020/lambda.smc")
-(load "../smoothlang/anc2020/bool.smc")
+(load "lambda.scm")
+(load "bool.scm")
 
 (define n0               drop)
 
@@ -13,13 +13,16 @@
 (define square          (fdup *))
 (define ^2              square)
 
+
 (define (zero?   n)     ((n (const false)) true))
-(define (<=    m n)     (zero? ((- m) n)))
-(define (>     m n)     (not ((<= m) n)))
-(define (=     m n)     ((and ((<= m) n)) ((<= n) m)))
-(define (>=    m n)     ((or ((> m) n)) ((= m) n)))
-(define (<     m n)     (not ((>= m) n)))
-(define (!=    m n)     (not ((= m) n)))
+(define (zero? n) ((n (lambda (x) false)) true))
+
+(define (<=    m) (lambda (n)     (zero? ((- m) n))))
+(define (>     m) (lambda (n)     (not ((<= m) n))))
+(define (=     m) (lambda (n)     ((fand ((<= m) n)) ((<= n) m))))
+(define (>=    m) (lambda (n)     ((for ((> m) n)) ((= m) n))))
+(define (<     m) (lambda (n)     (not ((>= m) n))))
+(define (!=    m) (lambda (n)     (not ((= m) n))))
 (define <>              !=)
 (define n0?              zero?)
 
@@ -32,6 +35,7 @@
 (define n7               (++ n6))
 (define n8               (++ n7))
 (define n9               (++ n8))
+(define n10              (++ n9))
 
 (define +gh             (fgh +))
 (define *gh             (fgh *))

@@ -1,7 +1,7 @@
 
-(load "../smoothlang/anc2020/lambda.smc")
-(load "../smoothlang/anc2020/bool.smc")
-(load "../smoothlang/anc2020/pair.smc")
+(load "lambda.scm")
+(load "bool.scm")
+(load "pair.scm")
 
 (define (cons h) (lambda (t) ((pair false) ((pair h) t))))
 (define nil        ((fdup pair) true))
