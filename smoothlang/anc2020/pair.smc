@@ -1,9 +1,9 @@
 
-(import smooth-lang/anc2020/lambda)
-(import smooth-lang/anc2020/bool)
+(load "../smoothlang/anc2020/lambda.smc")
+(load "../smoothlang/anc2020/bool.smc")
 
-(: pair            rsd3)
-(: fst             applies true)
-(: snd             applies false)
-(: (curry   f a b) f (pair a b))
-(: (uncurry f)     fgh f fst snd)
+(define pair            rsd3)
+(define fst             (applies true))
+(define snd             (applies false))
+(define (curry   f) (lambda (a) (lambda (b) (f ((pair a) b)))))
+(define (uncurry f)     (((fgh f) fst) snd))

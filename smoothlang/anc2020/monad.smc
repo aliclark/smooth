@@ -1,7 +1,7 @@
 
-(import smooth-lang/anc2020/lambda)
-(import smooth-lang/anc2020/list)
+(load lambda.smc)
+(load list.smc)
 
-(: (make->> f m1)       fcompose (f m1) const)
-(: (make-sequence_ f u) foldr f (u nil))
-(: (make-mapM_ s f)     fcompose s (map f))
+(define (make->> f m1)       (fcompose (f m1) const))
+(define (make-sequence_ f u) (foldr f (u nil)))
+(define (make-mapM_ s f)     (fcompose s (map f)))
