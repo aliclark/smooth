@@ -1,30 +1,45 @@
 
-;; In the distant future this will be changed to #
-(define comment-char #\;)
+; Why this isn't valid Smooth code:
+; * many reasons.
+; * implement an io monad before proceeding.
 
-; we are in a comment
-(define (read-comment in out)
-  (let ((c (read-char in)))
-    (if (eof-object? c)
-      #f ;done
-      (if (eq? c #\newline)
+(define (zero f x) x)
+(define (fifty-nine f x) (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f x))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+
+(define false (lambda (x) (lambda (y) y)))
+(define true  (lambda (x) (lambda (y) x)))
+(define semicolon #\;)
+(define comment-char semicolon) ; In the distant future this will be changed to #
+(define newlinech #\newline)
+(define stdin (current-input-port))
+(define stdout (current-output-port))
+
+(define (getc z) (read-char stdin))
+(define (putc c z) (write-char c stdout))
+
+(define (chareq? a b) (eq? a b))
+
+; need to upgrade to negativeable church numerals first
+(define (iseof? x) (eof-object? x))
+
+(define (read-comment z)
+  (let ((c (getc z)))
+    (if (iseof? c)
+      false ;done
+      (if (chareq? c newlinech)
         (begin
-          (write-char c out)
-          (read-normal in out))
-        (read-comment in out)))))
+          (putc c z)
+          (read-normal z))
+        (read-comment z)))))
 
-; we are not in a comment
-(define (read-normal in out)
-  (let ((c (read-char in)))
-    (if (eof-object? c)
-      #f ;done
-      (if (eq? c comment-char)
-        (read-comment in out)
+(define (read-normal z)
+  (let ((c (getc z)))
+    (if (iseof? c)
+      false ;done
+      (if (chareq? c comment-char)
+        (read-comment z)
         (begin
-          (write-char c out)
-          (read-normal in out))))))
+          (putc c z)
+          (read-normal z))))))
 
-(define (start)
-  (let ((in (current-input-port))
-         (out (current-output-port)))
-    (read-normal in out)))
+(define (start) (read-normal zero))
