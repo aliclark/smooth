@@ -1,5 +1,4 @@
 
-(define-macro (: . rest) `(define ,@rest))
 (define false #f)
 (define true  #t)
 (define nil   (list))
