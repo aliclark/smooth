@@ -42,9 +42,12 @@ echo "  loading included files" >&2
 echo "  expanding main variable" >&2
 ./runmod.scm varexpand.scm <$targ.out.1 >$targ.out.2
 rm $targ.out.1
-echo "  outputting target code" >&2
-./runmod.scm output-scm.scm <$targ.out.2 >$targ.out
+echo "  beta reducing" >&2
+./runmod.scm beta.scm <$targ.out.2 >$targ.out.3
 rm $targ.out.2
+echo "  outputting target code" >&2
+./runmod.scm output-scm.scm <$targ.out.3 >$targ.out
+rm $targ.out.3
 
 # Only do this once you are sure it is correct, or the previous version is well backed up.
 # It would be a pita to lose a working copy of the program.
