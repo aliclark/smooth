@@ -1,19 +1,24 @@
 (define (io_iocons v) (lambda (z) (cons v z)))
 (define (io_iocar x) (car x))
 (define (io_iocdr x) (cdr x))
+
 (define (io_inttochurch i)
   (lambda (f)
     (lambda (x)
       (let loop ((k i) (c x))
         (if (= k 0) c (loop (- k 1) (f c)))))))
+
 (define (io_churchtoint c) ((c (lambda (x) (+ x 1))) 0))
-(define io_stdin (current-input-port))
+
+(define io_stdin  (current-input-port))
 (define io_stdout (current-output-port))
-(define io_fgetb (lambda (f) (lambda (z)
-                               (let* ((c (read-char f))
-                                        ; for the very time being we can get away
-                                       ; with using 0 instead of -1 for EOF
-                                       (n (if (eof-object? c) 0 (char->integer c))))
-                                 ((io_iocons n) z)))))
-(define io_fputb (lambda (f) (lambda (c) (lambda (z) ((io_iocons (write-char (integer->char c) f)) z)))))
+
+(define (io_fgetb f)
+  (lambda (z)
+    (let ((c (read-char f)))
+      ; for the very time being we can get away
+      ; with using 0 instead of -1 for EOF
+      ((io_iocons (if (eof-object? c) 0 (char->integer c))) z))))
+
+(define (io_fputb f) (lambda (c) (io_iocons (write-char (integer->char c) f))))
 (((lambda(f)((lambda(x)(f (lambda(v)((x x) v)))) (lambda(x)(f (lambda(v)((x x) v)))))) (lambda(read-normal)((lambda(read-comment)(((lambda(m)(lambda(f)(lambda(r)((lambda(v1)((f (io_iocar v1)) (io_iocdr v1))) (m r))))) (((lambda(m)(lambda(f)(lambda(r)((lambda(v1)((f (io_iocar v1)) (io_iocdr v1))) (m r))))) (io_fgetb io_stdin)) (lambda(c)((lambda(x)(lambda(r)((io_iocons x) r))) (io_inttochurch c))))) (lambda(c)((((lambda(x)x) ((lambda(x)((lambda(n)((n (((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))) (lambda(a)(lambda(b)b)))) ((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))))) x)) c)) ((lambda(x)(lambda(r)((io_iocons x) r))) (lambda(x)x))) ((((lambda(x)x) (((lambda(a)(lambda(b)(((lambda(m)(lambda(n)(((lambda(f)(lambda(a)((f a) f))) (((lambda(m)(lambda(n)((lambda(n)((n (((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))) (lambda(a)(lambda(b)b)))) ((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))))) (((lambda(m)(lambda(n)((n (lambda(n)(lambda(f)(lambda(x)(((n (lambda(g)(lambda(h)(h (g f))))) (((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))) x)) (lambda(x)x)))))) m))) m) n)))) m) n)) (((lambda(m)(lambda(n)((lambda(n)((n (((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))) (lambda(a)(lambda(b)b)))) ((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))))) (((lambda(m)(lambda(n)((n (lambda(n)(lambda(f)(lambda(x)(((n (lambda(g)(lambda(h)(h (g f))))) (((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))) x)) (lambda(x)x)))))) m))) m) n)))) n) m)))) a) b))) c) (lambda(f)(lambda(x)(f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f (f x))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) read-comment) ((((lambda(f)(lambda(m1)(lambda(m2)((f m1) (lambda(x)m2))))) (lambda(m)(lambda(f)(lambda(r)((lambda(v1)((f (io_iocar v1)) (io_iocdr v1))) (m r)))))) ((lambda(c)((io_fputb io_stdout) (io_churchtoint c))) c)) read-normal)))))) ((lambda(f)((lambda(x)(f (lambda(v)((x x) v)))) (lambda(x)(f (lambda(v)((x x) v)))))) (lambda(read-comment)(((lambda(m)(lambda(f)(lambda(r)((lambda(v1)((f (io_iocar v1)) (io_iocdr v1))) (m r))))) (((lambda(m)(lambda(f)(lambda(r)((lambda(v1)((f (io_iocar v1)) (io_iocdr v1))) (m r))))) (io_fgetb io_stdin)) (lambda(c)((lambda(x)(lambda(r)((io_iocons x) r))) (io_inttochurch c))))) (lambda(c)((((lambda(x)x) ((lambda(x)((lambda(n)((n (((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))) (lambda(a)(lambda(b)b)))) ((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))))) x)) c)) ((lambda(x)(lambda(r)((io_iocons x) r))) (lambda(x)x))) ((((lambda(x)x) (((lambda(a)(lambda(b)(((lambda(m)(lambda(n)(((lambda(f)(lambda(a)((f a) f))) (((lambda(m)(lambda(n)((lambda(n)((n (((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))) (lambda(a)(lambda(b)b)))) ((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))))) (((lambda(m)(lambda(n)((n (lambda(n)(lambda(f)(lambda(x)(((n (lambda(g)(lambda(h)(h (g f))))) (((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))) x)) (lambda(x)x)))))) m))) m) n)))) m) n)) (((lambda(m)(lambda(n)((lambda(n)((n (((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))) (lambda(a)(lambda(b)b)))) ((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))))) (((lambda(m)(lambda(n)((n (lambda(n)(lambda(f)(lambda(x)(((n (lambda(g)(lambda(h)(h (g f))))) (((lambda(f)(lambda(a)(lambda(b)((f b) a)))) (lambda(a)(lambda(b)b))) x)) (lambda(x)x)))))) m))) m) n)))) n) m)))) a) b))) c) ((lambda(n)(lambda(f)(lambda(x)(f ((n f) x))))) ((lambda(n)(lambda(f)(lambda(x)(f ((n f) x))))) ((lambda(n)(lambda(f)(lambda(x)(f ((n f) x))))) ((lambda(n)(lambda(f)(lambda(x)(f ((n f) x))))) ((lambda(n)(lambda(f)(lambda(x)(f ((n f) x))))) ((lambda(n)(lambda(f)(lambda(x)(f ((n f) x))))) ((lambda(n)(lambda(f)(lambda(x)(f ((n f) x))))) ((lambda(n)(lambda(f)(lambda(x)(f ((n f) x))))) ((lambda(n)(lambda(f)(lambda(x)(f ((n f) x))))) ((lambda(n)(lambda(f)(lambda(x)(f ((n f) x))))) (lambda(a)(lambda(b)b)))))))))))))) ((((lambda(f)(lambda(m1)(lambda(m2)((f m1) (lambda(x)m2))))) (lambda(m)(lambda(f)(lambda(r)((lambda(v1)((f (io_iocar v1)) (io_iocdr v1))) (m r)))))) ((lambda(c)((io_fputb io_stdout) (io_churchtoint c))) c)) read-normal)) read-comment))))))))) (lambda(a)(lambda(b)b)))
