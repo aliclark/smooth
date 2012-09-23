@@ -1,35 +1,56 @@
 
-Smooth is an untyped, strictly evaluating Lambda Calculus compiler, with S-expression syntax and macros.
+Smooth is an untyped, strictly evaluating Lambda Calculus compiler,
+with S-expression syntax and macros.
 
 This project implements a compiler for Smooth.
 
 
 This language and compiler is different from others in that:
 
-* The compiler will reduce lambda expressions at compile time, effectively running as much of the program as possible before compiling the rest.
+* The compiler will reduce lambda expressions at compile time,
+  effectively running as much of the program as possible before
+  compiling the rest.
 
 * The compiler will perform whole-program optimisation.
 
-* The compiler implementation is very modular, allowing language features to be easily implemented, changed or tested independently.
+* The compiler implementation is very modular, allowing language
+  features to be easily implemented, changed or tested independently.
 
-* The module system will be very, well, modular. It combines ideas from Java's dependency injection for module dependencies, and NodeJS/Javascript's notion of returning modules as first-class language objects.
+* The module system will be very, well, modular. It combines ideas
+  from Java's dependency injection for module dependencies, and
+  NodeJS/Javascript's notion of returning modules as first-class
+  language objects.
 
-* A key priority of the language design is that the output of the compiler should be tiny, even potentially without a dependency on libc.
+* A key priority of the language design is that the output of the
+  compiler should be tiny, even potentially without a dependency on
+  libc.
 
 
 Because lambda expressions are reduced at compile time:
 
-* It is possible to perform run-time type checking which actually runs at compile time, thus allowing the language to be it's own turing-complete type system.
+* It is possible to perform run-time type checking which actually runs
+  at compile time, thus allowing the language to be it's own
+  turing-complete type system.
 
-* There is no run-time cost to the module system in using first-class modules as inputs and outputs to other modules.
+* There is no run-time cost to the module system in using first-class
+  modules as inputs and outputs to other modules.
 
-* Macros are first-class during compile time. If any macros are unevaluated before run-time this will be flagged as an error. This means that macros can be supplied as dependencies to a module in the same way as normal functions can.
+* Macros are first-class during compile time. If any macros are
+  unevaluated before run-time this will be flagged as an error. This
+  means that macros can be supplied as dependencies to a module in the
+  same way as normal functions can.
 
 
-This project is still at an early stage, so the generated code is slow, and the error messages are nearly non-existent.
+This project is still at an early stage, so the generated code is
+slow, and the error messages are nearly non-existent.
 
-The program src/comments.smc is written in the Smooth programming language (albeit in a very Scheme-like way).
+The program src/comments.smc is written in the Smooth programming
+language (albeit in a very Scheme-like way).
 
-To build this program, run ./build-comments.sh in the directory root of the project.
+To build this program, run ./build-comments.sh in the directory root
+of the project.
 
-Both the build script and code should give a starting point for writing code in the language now, but as the language grows it will start to look much less like Scheme code (and much more practicably useful to program in Smooth as opposed to any other language).
+Both the build script and code should give a starting point for
+writing code in the language now, but as the language grows it will
+start to look much less like Scheme code (and much more practicably
+useful to program in Smooth as opposed to any other language).
