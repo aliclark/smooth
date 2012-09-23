@@ -10,8 +10,7 @@
 
 ;; IO lib
 
-; iocons should only be used by native code
-(define (io_iocons v z) (nativecons v z))
+(define (io_iocons v) (lambda (z) (nativecons v z)))
 
 (define (io_iocar x) (nativecar x))
 (define (io_iocdr x) (nativecdr x))
@@ -30,11 +29,11 @@
 (define io_fgetb (lambda (f) (lambda (z)
                                (let* ((c (read-char f))
                                        (n (if (eof-object? c) 0 (char->integer c))))
-                                 (io_iocons n z)))))
+                                 ((io_iocons n) z)))))
 (define io_fputb
   (lambda (f)
     (lambda (c)
       (lambda (z)
-        (io_iocons
-          (write-char (integer->char c) f)
+        ((io_iocons
+           (write-char (integer->char c) f))
           z)))))

@@ -1,6 +1,6 @@
 
-(load "lambda.scm")
-(load "bool.scm")
+;(load "lambda.scm")
+;(load "bool.scm")
 
 (define n0               drop)
 

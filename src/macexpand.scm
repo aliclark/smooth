@@ -87,6 +87,19 @@
           (syn (string->symbol (string-append "__" (symbol->string s) "__"))))
     (parseobj-mk (cons (parseobj-mk syn sp) args) props)))
 
+;; (load "...") -> (__load__ ...)
+(define (load-macro sx args props)
+  (let* ((s (parseobj-obj sx))
+          (sp (parseobj-props sx))
+          (syn (string->symbol (string-append "__" (symbol->string s) "__")))
+          (fstr (symbol->string (parseobj-obj (car args))))
+          (fsym (string->symbol (string-append (substring fstr 1 (- (string-length fstr) 5)) ".smo"))))
+
+    ;; FIXME: use fsym 
+    (macropobj (list (macropobj '__load__) (macropobj fsym)))))
+
+;    (parseobj-mk (cons (parseobj-mk syn sp) args) props)))
+
 ;; (let ((v x) ...) exp) -> ((__lambda__ v (let (...) exp)) x)
 ;; (let ()          exp) -> exp
 (define (let-macro args props)
@@ -150,8 +163,9 @@
     (cond
       ((eq? mac 'comment)
         (comment-macro args props))
-      ((or (eq? mac 'load) (eq? mac 'decmacro) (eq? mac 'extern))
+      ((or (eq? mac 'decmacro) (eq? mac 'extern))
         (specialnym-macro (car x) args props))
+      ((eq? mac 'load)   (load-macro (car x) args props))
       ((eq? mac 'let)    (let-macro  args props))
       ((eq? mac 'lambda) (lambda-macro   args props))
       ((eq? mac 'define) (def-macro  args props))

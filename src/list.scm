@@ -1,7 +1,7 @@
 
-(load "lambda.scm")
-(load "bool.scm")
-(load "pair.scm")
+;(load "lambda.scm")
+;(load "bool.scm")
+;(load "pair.scm")
 
 (define (cons h) (lambda (t) ((pair false) ((pair h) t))))
 (define nil        ((fdup pair) true))

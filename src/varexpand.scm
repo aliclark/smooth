@@ -32,25 +32,27 @@
 
 (define main-symbol 'main)
 
-(define (reduce-value internal-defines shadows px)
+(define (reduce-value internal-defines shadows px indefs)
   (let ((x (parseobj-obj px)))
     (if (list? x)
       (if (reserved-form-type? px '__lambda__ 3)
         (parseobj-sel 2
           (lambda (y)
-            (reduce-value internal-defines (ensure-contains (parseobj-obj (cadr x)) shadows) y))
+            (reduce-value internal-defines (ensure-contains (parseobj-obj (cadr x)) shadows) y indefs))
           px)
         (if (reserved-form-type? px '__extern__ 2)
           px
           (parseobj-mk
-            (p-map (lambda (z) (reduce-value internal-defines shadows z)) x)
+            (p-map (lambda (z) (reduce-value internal-defines shadows z indefs)) x)
             (parseobj-props px))))
       (if (contains? shadows x)
         px
-        (let ((val (assoc-ref internal-defines x #f)))
-          (if (eq? val #f)
-            (begin (display (list 'unbound 'var_ x)) #f)
-            (reduce-value internal-defines p-null val)))))))
+        (if (contains? indefs x)
+          (begin (display x) (newline) 'error-in-definition-of-this-symbol)
+          (let ((val (assoc-ref internal-defines x #f)))
+            (if (eq? val #f)
+              (begin (display (list 'unbound 'var_ x)) #f)
+              (reduce-value internal-defines p-null val (cons x indefs)))))))))
 
 (define (assoc-append x1 x2)
   (if (null? x1)
@@ -80,7 +82,7 @@
             (list
               (parseobj-mk
                 (list (parseobj-mk '__start__ '())
-                  (reduce-value internal-defines p-null m))
+                  (reduce-value internal-defines p-null m (list main-symbol)))
                 '()))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

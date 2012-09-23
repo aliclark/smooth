@@ -9,7 +9,7 @@
 (define inttochurch (extern io_inttochurch))
 (define churchtoint (extern io_churchtoint))
 
-(define (return x) (lambda (r) (iocons x r)))
+(define (return x) (lambda (r) ((iocons x) r)))
 
 (define (>>= m)
   (lambda (f)

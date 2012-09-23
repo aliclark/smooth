@@ -83,7 +83,7 @@
 
 (define (apply-to-scm x)
   (if (not (= (length x) 2))
-    "Expression wrong size"
+    (begin (display-error "Expression wrong size") (parse-output-to-port (current-error-port) x) "---ERROR---")
     (string-append "(" (expr-to-scm (car x)) " " (expr-to-scm (cadr x)) ")")))
 
 (define (extern-to-scm x)
@@ -118,7 +118,7 @@
     (lookup-to-scm x)))
 
 (define preamble
-"(define (io_iocons v z) (cons v z))
+"(define (io_iocons v) (lambda (z) (cons v z)))
 (define (io_iocar x) (car x))
 (define (io_iocdr x) (cdr x))
 (define (io_inttochurch i)
@@ -132,8 +132,8 @@
 (define io_fgetb (lambda (f) (lambda (z)
                                (let* ((c (read-char f))
                                        (n (if (eof-object? c) 0 (char->integer c))))
-                                 (io_iocons n z)))))
-(define io_fputb (lambda (f) (lambda (c) (lambda (z) (io_iocons (write-char (integer->char c) f) z)))))
+                                 ((io_iocons n) z)))))
+(define io_fputb (lambda (f) (lambda (c) (lambda (z) ((io_iocons (write-char (integer->char c) f)) z)))))
 ")
 
 (define (simplescm-output p l)

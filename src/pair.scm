@@ -1,6 +1,6 @@
 
-(load "lambda.scm")
-(load "bool.scm")
+;(load "lambda.scm")
+;(load "bool.scm")
 
 (define pair            rsd3)
 (define fst             (applies true))

@@ -1,6 +1,10 @@
 
+
+;TODO: macexpand "load" still broken
+
+
 ; this will be removed before converting to smooth
-(load "schemeup.scm")
+;(load "schemeup.scm")
 
 (load "lambda.scm")
 (load "bool.scm")
@@ -41,12 +45,22 @@
 (define read-normal
   (Y
     (lambda (read-normal)
-      ((>>= getc)
-        (lambda (c)
-          (((fif (iseof? c))
-             (return id))
-            (((fif ((chareq? c) comment-char))
-                 read-comment)
-              ((>> (putc c)) read-normal))))))))
+      (let ((read-comment (Y
+                            (lambda (read-comment)
+                              ((>>= getc)
+                                (lambda (c)
+                                  (((fif (iseof? c))
+                                     (return id))
+                                    (((fif ((chareq? c) newlinech))
+                                       ((>> (putc c)) read-normal))
+                                      read-comment))))))))
 
-(define (start) (read-normal n0))
+        ((>>= getc)
+          (lambda (c)
+            (((fif (iseof? c))
+               (return id))
+              (((fif ((chareq? c) comment-char))
+                 read-comment)
+                ((>> (putc c)) read-normal)))))))))
+
+(define main (read-normal n0))

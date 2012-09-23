@@ -1,5 +1,5 @@
 
-(load "lambda.scm")
+;(load "lambda.scm")
 
 (define fif   id)
 (define false drop)

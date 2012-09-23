@@ -564,4 +564,7 @@
 (define (parse-output-to-port-literally h p) (display (parse-object-string p) h))
 (define (parse-output-to-port h p) (map (lambda (x) (parse-output-to-port-literally h x) (newline h)) p))
 
+(define (display-error x)
+  (display x (current-error-port)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
