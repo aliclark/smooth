@@ -52,4 +52,4 @@ rm $targ.out.3
 # Only do this once you are sure it is correct, or the previous version is well backed up.
 # It would be a pita to lose a working copy of the program.
 
-#mv $targ.out $targ
+mv $targ.out $targ
