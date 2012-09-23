@@ -1,11 +1,7 @@
 
-
-;TODO: macexpand "load" still broken
-
-
-; this will be removed before converting to smooth
-;(load "schemeup.scm")
-
+; For now, these should remain valid scheme files,
+; as well as valid smooth files, to make it easy
+; to gradually port other scheme programs to smooth.
 (load "lambda.scm")
 (load "bool.scm")
 (load "pair.scm")
@@ -25,22 +21,6 @@
 
 (define comment-char semicolon) ; In the distant future this will be changed to #
 ; TODO: (define comment-char hash)
-
-(define Y
-  (lambda (f)
-    ((lambda (x) (f (lambda (v) ((x x) v))))
-     (lambda (x) (f (lambda (v) ((x x) v)))))))
-
-(define read-comment
-  (Y
-    (lambda (read-comment)
-      ((>>= getc)
-        (lambda (c)
-          (((fif (iseof? c))
-             (return id))
-            (((fif ((chareq? c) newlinech))
-               ((>> (putc c)) read-normal))
-              read-comment)))))))
 
 (define read-normal
   (Y
