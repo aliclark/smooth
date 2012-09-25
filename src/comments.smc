@@ -43,4 +43,4 @@
                  read-comment)
                 ((>> (putc c)) read-normal)))))))))
 
-(define main (read-normal n0))
+(define main (read-normal (churchtoint n0)))
