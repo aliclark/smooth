@@ -139,14 +139,40 @@
 (define io_stdin  (current-input-port))
 (define io_stdout (current-output-port))
 
+; This must not be called in parallel
+(define io_fgetb_tabl (make-table))
+(define io_fgetb_z 0)
 (define (io_fgetb f)
   (lambda (z)
-    (let ((c (read-char f)))
-      ; for the very time being we can get away
-      ; with using 0 instead of -1 for EOF
-      ((io_iocons (if (eof-object? c) 0 (char->integer c))) z))))
+    (let ((nexz (+ z 1)))
+      (if (> io_fgetb_z z)
 
-(define (io_fputb f) (lambda (c) (io_iocons (write-char (integer->char c) f))))
+        ((io_iocons (table-ref io_fgetb_tabl z)) nexz)
+
+        (let* ((c (read-char f))
+                (ch (if (eof-object? c) 0 (char->integer c))))
+
+          (set! io_fgetb_z nexz)
+          (table-set! io_fgetb_tabl z ch)
+
+          ; for the very time being we can get away
+          ; with using 0 instead of -1 for EOF
+          ((io_iocons ch) nexz))))))
+
+; This must not be called in parallel
+(define io_fputb_z 0)
+(define (io_fputb f)
+  (lambda (c)
+    (lambda (z)
+      (let ((nexz (+ z 1)))
+        (if (> io_fputb_z z)
+
+          ((io_iocons #f) nexz)
+
+          (begin
+            (set! io_fputb_z nexz)
+            (write-char (integer->char c) f)
+            ((io_iocons #f) nexz)))))))
 ")
 
 (define (simplescm-output p l)
