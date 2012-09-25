@@ -26,7 +26,10 @@
 
 (define getb (fgetb stdin))
 
-;; somehow the problem happens in here...
+;; TODO: check - are we actually doing a syscall on each fputb?
+;; If so, try to add a line buffer in basicio
+;; If that's not feasible, add one to the output-scm native IO lib
+;; (remember a final flush call is needed on program exit).
 (define putb (fputb stdout))
 
 (define getc
