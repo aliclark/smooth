@@ -25,12 +25,6 @@
         arg
         exp))))
 
-(define (reduce-end px x fx)
-  (parseobj-mk
-    (list fx (cadr x))
-    (parseobj-props px)))
-
-;; Using the following reduction will potentially not terminate.
 (define (reduce-full-end px x fx)
   (parseobj-mk
     (list fx (reduce-form (cadr x)))
