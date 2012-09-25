@@ -35,7 +35,8 @@
 ;;; UTF8 -> | comments | indentation | -> SEXPR -> | parseobj | expand | -> PARSEOBJ
 ;;;
 ;;; Back-end pipe on just the main code file:
-;;; PARSEOBJ -> | load | vars | dearitise | betareduce | velcro | errsprint | rearitise | output | -> SCHEME
+;;; PARSEOBJ -> | load | vars | dearitise | betareduce | aggressivereduce | enbrujin | dedupe |\
+;;;      velcro | errsprint | rearitise | output | -> SCHEME
 ;;;
 ;;; We like to run load first, because then there is
 ;;; no special behaviour given to this file over the included ones.
@@ -56,6 +57,11 @@
 ;;;   APP = (E E)
 ;;;   VAR = VAR declared by an enclosing LAM
 ;;;   EXT = (__extern__ someidentifier)
+
+;;; The enbrujin step makes it easier for the compiler to spot alpha equivalence,
+;;; which enables optimisation in reducing duplication at the dedupe step.
+;;; In the dedupe step we convert things into let forms, which afaik
+;;; will be enough to express shared values.
 
 ;; Useful symbols:
 ;; __lambda__ __begin__ __extern__
