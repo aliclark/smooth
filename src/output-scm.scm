@@ -123,6 +123,18 @@
         (#t                  (apply-to-scm  x))))
     (lookup-to-scm x)))
 
+;; Both gsi and guile buffer input. For some reason,
+;; gsi seems to do a separate write syscall for each char,
+;; even when calling (display "abc")
+;;
+;; Even so, calling once with the string seems to give
+;; a speed improvement of perhaps 20%
+;;
+;; guile now works but is slower than gsi, even with the bulk writes.
+;;
+;; Anyhow, sometime in the future we would like the user code
+;; to implement buffering, and not do it here.
+
 (define preamble
 "(define (io_iocons v) (lambda (z) (cons v z)))
 (define (io_iocar x) (car x))
@@ -140,26 +152,37 @@
 (define io_stdout (current-output-port))
 
 ; This must not be called in parallel
-(define io_fgetb_tabl (make-table))
+(define io_fgetb_tabl_size 1024)
+(define io_fgetb_tabl (make-string io_fgetb_tabl_size))
 (define io_fgetb_z 0)
 (define (io_fgetb f)
   (lambda (z)
     (let ((nexz (+ z 1)))
       (if (> io_fgetb_z z)
 
-        ((io_iocons (table-ref io_fgetb_tabl z)) nexz)
+        ;; result will be undefined if z hasn't actually
+        ;; been used yet
+        ((io_iocons (char->integer (string-ref io_fgetb_tabl z))) nexz)
 
         (let* ((c (read-char f))
-                (ch (if (eof-object? c) 0 (char->integer c))))
+                ; for the very time being we can get away
+                ; with using 0 instead of -1 for EOF
+                (ch  (if (eof-object? c) (integer->char 0) c))
+                (chi (char->integer ch)))
+
+          (if (>= z io_fgetb_tabl_size)
+            (let ((tmp (make-string io_fgetb_tabl_size)))
+              (set! io_fgetb_tabl_size (* io_fgetb_tabl_size 2))
+              (set! io_fgetb_tabl (string-append io_fgetb_tabl tmp)))
+            'noop)
 
           (set! io_fgetb_z nexz)
-          (table-set! io_fgetb_tabl z ch)
+          (string-set! io_fgetb_tabl z ch)
 
-          ; for the very time being we can get away
-          ; with using 0 instead of -1 for EOF
-          ((io_iocons ch) nexz))))))
+          ((io_iocons chi) nexz))))))
 
 ; This must not be called in parallel
+(define io_fputb_buffer '())
 (define io_fputb_z 0)
 (define (io_fputb f)
   (lambda (c)
@@ -171,15 +194,23 @@
 
           (begin
             (set! io_fputb_z nexz)
-            (write-char (integer->char c) f)
+            (set! io_fputb_buffer (cons (integer->char c) io_fputb_buffer))
             ((io_iocons #f) nexz)))))))
+
+(define (io_flush_output_buffer)
+  (display (list->string (reverse io_fputb_buffer))))
+")
+
+(define postamble
+"
+(io_flush_output_buffer)
 ")
 
 (define (simplescm-output p l)
   ; for now assume the last item is the expression
   (let* ((expr (cadr (p-last l)))
          (thecode (expr-to-scm expr)))
-    (display (string-append preamble thecode) p)
+    (display (string-append preamble thecode postamble) p)
     (newline p)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
