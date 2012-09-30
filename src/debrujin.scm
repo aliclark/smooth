@@ -29,7 +29,7 @@
     (if (list? x)
       (if (reserved-form-type? px '__lambda__ 3)
         (parseobj-sel 1
-          (lambda (v) (parseobj-mk '__debrujin__ '()))
+          (lambda (v) (parseobj-mk '__debrujin__ (parseobj-props v)))
           (parseobj-sel 2
             (lambda (exp)
               (debrujin exp
