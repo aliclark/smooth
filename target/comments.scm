@@ -27,6 +27,8 @@
         ((io_iocons (char->integer (string-ref io_fgetb_tabl z))) nexz)
 
         (let* ((c (read-char f))
+                ; for the very time being we can get away
+                ; with using 0 instead of -1 for EOF
                 (ch  (if (eof-object? c) (integer->char 0) c))
                 (chi (char->integer ch)))
 
@@ -39,8 +41,6 @@
           (set! io_fgetb_z nexz)
           (string-set! io_fgetb_tabl z ch)
 
-          ; for the very time being we can get away
-          ; with using 0 instead of -1 for EOF
           ((io_iocons chi) nexz))))))
 
 ; This must not be called in parallel
