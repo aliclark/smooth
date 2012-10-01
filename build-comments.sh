@@ -21,15 +21,30 @@ deps="lambda.scm bool.scm pair.scm numeral.scm list.scm basicio.scm $srcfile"
 
 for f in $deps; do
     fout=`echo $f | sed s/\.smc$/\.smo/ | sed s/\.scm$/\.smo/`
-    echo "precompiling dependency $f to $fout" >&2
-    echo "  comment stripping" >&2
-    gsi ../target/comments.scm <$f >$fout.1
-    echo "  creating parse objects" >&2
-    ./runmod.scm sexpr-to-parseobj.scm <$fout.1 >$fout.2
-    rm $fout.1
-    echo "  macro expansion" >&2
-    ./runmod.scm macexpand.scm <$fout.2 > $fout
-    rm $fout.2
+
+    progs="../target/comments.scm ./runmod.scm sexpr-to-parseobj.scm macexpand.scm"
+    progchange=''
+
+    for g in $progs; do
+        if [ -f $fout ] && [ "`stat -c '%Y' $g`" -ge "`stat -c '%Y' $fout`" ]; then
+            echo $g is too new
+            progchange=1
+        fi
+    done
+
+    if [ "$progchange" != "" ] || (! ([ -f $fout ] && [ "`stat -c '%Y' $fout`" -gt "`stat -c '%Y' $f`" ])); then
+        echo "precompiling dependency $f to $fout" >&2
+        echo "  comment stripping" >&2
+        gsi ../target/comments.scm <$f >$fout.1
+        echo "  creating parse objects" >&2
+        ./runmod.scm sexpr-to-parseobj.scm <$fout.1 >$fout.2
+        rm $fout.1
+        echo "  macro expansion" >&2
+        ./runmod.scm macexpand.scm <$fout.2 > $fout
+        rm $fout.2
+    else
+        echo "dependency $fout is precompiled" >&2
+    fi
 done
 
 srcpre=`echo $f | sed s/\.smc$/\.smo/ | sed s/\.scm$/\.smo/`
@@ -53,7 +68,9 @@ echo "  outputting target code" >&2
 ./runmod.scm output-scm.scm <$targ.out.3 >$targ.out
 rm $targ.out.3
 
-# Only do this once you are sure it is correct, or the previous version is well backed up.
-# It would be a pita to lose a working copy of the program.
-
-mv $targ.out $targ
+if ! diff $targ.out $targ ; then
+    mv $targ.out $targ
+else
+    echo 'target has not changed'
+    rm $targ.out
+fi
