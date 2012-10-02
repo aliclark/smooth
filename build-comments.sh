@@ -6,7 +6,7 @@
 
 if [ ! -d ./src ]; then
   if [ ! -d ../src ]; then
-    echo 'cant find src';
+    echo 'cant find src' >&2
     exit
   fi
 else
@@ -27,23 +27,29 @@ for f in $deps; do
 
     for g in $progs; do
         if [ -f $fout ] && [ "`stat -c '%Y' $g`" -ge "`stat -c '%Y' $fout`" ]; then
-            echo $g is too new
+            echo $g has changed >&2
             progchange=1
         fi
     done
 
     if [ "$progchange" != "" ] || (! ([ -f $fout ] && [ "`stat -c '%Y' $fout`" -gt "`stat -c '%Y' $f`" ])); then
         echo "precompiling dependency $f to $fout" >&2
-        echo "  comment stripping" >&2
-        gsi ../target/comments.scm <$f >$fout.1
-        echo "  creating parse objects" >&2
-        ./runmod.scm sexpr-to-parseobj.scm <$fout.1 >$fout.2
+
+        echo -n "  comment stripping     " >&2
+        dur=`2>&1 /usr/bin/time -f "%e" gsi ../target/comments.scm <$f >$fout.1`
+        printf " $dur secs\n" >&2
+
+        echo -n "  creating parse objects" >&2
+        dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm sexpr-to-parseobj.scm <$fout.1 >$fout.2`
         rm $fout.1
-        echo "  macro expansion" >&2
-        ./runmod.scm macexpand.scm <$fout.2 > $fout
+        printf " $dur secs\n" >&2
+
+        echo -n "  macro expansion       " >&2
+        dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm macexpand.scm <$fout.2 > $fout`
         rm $fout.2
+        printf " $dur secs\n" >&2
     else
-        echo "dependency $fout is precompiled" >&2
+        printf "dependency $fout\tis precompiled\n" >&2
     fi
 done
 
@@ -53,24 +59,40 @@ targ=../target/`echo $srcpre | sed s/\.smo$/\.scm/`
 # .smo files are ready to be load'ed
 echo "compiling srcfile $srcfile to $targ.out" >&2
 
-echo "  loading included files" >&2
-./runmod.scm load.scm <$srcpre >$targ.out.1
+echo -n "  loading included files " >&2
+dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm load.scm <$srcpre >$targ.out.1`
+printf " $dur secs\n" >&2
 
-echo "  expanding main variable" >&2
-./runmod.scm varexpand.scm <$targ.out.1 >$targ.out.2
+echo -n "  expanding main variable" >&2
+dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm varexpand.scm <$targ.out.1 >$targ.out.2`
 rm $targ.out.1
+printf " $dur secs\n" >&2
 
-echo "  beta reducing" >&2
-./runmod.scm beta.scm <$targ.out.2 >$targ.out.3
+echo -n "  beta reducing          " >&2
+dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm beta.scm <$targ.out.2 >$targ.out.3`
 rm $targ.out.2
+printf " $dur secs\n" >&2
 
-echo "  outputting target code" >&2
-./runmod.scm output-scm.scm <$targ.out.3 >$targ.out
+echo -n "  debrujin conversion    " >&2
+dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm debrujin.scm <$targ.out.3 >$targ.out.4`
 rm $targ.out.3
+printf " $dur secs\n" >&2
 
-if ! diff $targ.out $targ ; then
+echo -n "  dedebrujin conversion  " >&2
+dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm dedebrujin.scm <$targ.out.4 >$targ.out.5`
+
+#rm $targ.out.4
+
+printf " $dur secs\n" >&2
+
+echo -n "  outputting target code " >&2
+dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm output-scm.scm <$targ.out.5 >$targ.out`
+rm $targ.out.5
+printf " $dur secs\n" >&2
+
+if ! diff $targ.out $targ >/dev/null 2>&1 ; then
     mv $targ.out $targ
 else
-    echo 'target has not changed'
+    echo 'target has not changed' >&2
     rm $targ.out
 fi
