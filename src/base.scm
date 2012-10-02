@@ -512,7 +512,12 @@
   (read-charlist-as-parseobj (read-charlist-from-port p)))
 
 (define (read-sexprs-from-port p)
-  (parse-strip-meta (read-parseobj-from-port p)))
+;  (parse-strip-meta (read-parseobj-from-port p)))
+
+  (let ((x (read p)))
+    (let ((props (read p)))
+      (parseobj-mk x props))))
+    
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Parse tree error checking
@@ -576,7 +581,16 @@
     p))
 
 (define (parse-output-to-port-literally h p) (display (parse-object-string p) h))
-(define (parse-output-to-port h p) (map (lambda (x) (parse-output-to-port-literally h x) (newline h)) p))
+
+(define (parse-output-to-port h p)
+;  (map (lambda (x) (parse-output-to-port-literally h x) (newline h)) p))
+
+  (if (null? p)
+    'done
+    (begin
+      (write (car p) h)
+      (parse-output-to-port h (cdr p)))))
+
 
 (define (display-error x)
   (display x (current-error-port)))
