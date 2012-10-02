@@ -29,7 +29,9 @@
                       (map (lambda (p) (list (+ (car p) 1) (cadr p))) vari))))
                 px)))
           'error-not-debrujin)
-        (parseobj-mk (map (lambda (x) (dedebrujin x vari)) x) (parseobj-props px)))
+        (if (reserved-symbol-obj? px)
+          px
+          (parseobj-mk (map (lambda (x) (dedebrujin x vari)) x) (parseobj-props px))))
       (parseobj-mk (assoc-ref vari (symbol->number x) #f) (parseobj-props px)))))
 
 (define parse-phase-dedebrujin

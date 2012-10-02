@@ -36,7 +36,9 @@
                 (cons (list (parseobj-obj (cadr x)) 0)
                   (map (lambda (p) (list (car p) (+ (cadr p) 1))) vari))))
             px))
-        (parseobj-mk (map (lambda (x) (debrujin x vari)) x) (parseobj-props px)))
+        (if (reserved-symbol-obj? px)
+          px
+          (parseobj-mk (map (lambda (x) (debrujin x vari)) x) (parseobj-props px))))
       (parseobj-mk (number->symbol (assoc-ref vari x #f)) (parseobj-props px)))))
 
 (define parse-phase-debrujin
