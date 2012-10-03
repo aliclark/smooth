@@ -30,7 +30,7 @@ Because lambda expressions are reduced at compile time:
 
 * It is possible to perform run-time type checking which actually runs
   at compile time, thus allowing the language to be it's own
-  turing-complete type system.
+  turing-complete static type system.
 
 * There is no run-time cost to the module system in using first-class
   modules as inputs and outputs to other modules.
