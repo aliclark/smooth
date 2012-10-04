@@ -78,14 +78,19 @@ dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm debrujin.scm <$targ.out.3 >$targ.ou
 rm $targ.out.3
 printf " $dur secs\n" >&2
 
-echo -n "  dedebrujin conversion  " >&2
-dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm dedebrujin.scm <$targ.out.4 >$targ.out.5`
+echo -n "  deduplication          " >&2
+dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm dedup.scm <$targ.out.4 >$targ.out.5`
 rm $targ.out.4
 printf " $dur secs\n" >&2
 
-echo -n "  outputting target code " >&2
-dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm output-scm.scm <$targ.out.5 >$targ.out`
+echo -n "  dedebrujin conversion  " >&2
+dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm dedebrujin.scm <$targ.out.5 >$targ.out.6`
 rm $targ.out.5
+printf " $dur secs\n" >&2
+
+echo -n "  outputting target code " >&2
+dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm output-scm.scm <$targ.out.6 >$targ.out`
+rm $targ.out.6
 printf " $dur secs\n" >&2
 
 if ! diff $targ.out $targ >/dev/null 2>&1 ; then
