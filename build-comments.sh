@@ -80,9 +80,7 @@ printf " $dur secs\n" >&2
 
 echo -n "  dedebrujin conversion  " >&2
 dur=`2>&1 /usr/bin/time -f "%e" ./runmod.scm dedebrujin.scm <$targ.out.4 >$targ.out.5`
-
-#rm $targ.out.4
-
+rm $targ.out.4
 printf " $dur secs\n" >&2
 
 echo -n "  outputting target code " >&2
