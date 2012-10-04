@@ -1,6 +1,6 @@
 
-Smooth is an untyped, strictly evaluating Lambda Calculus compiler,
-with S-expression syntax and macros.
+Smooth is an untyped, strictly evaluating Lambda Calculus language with
+S-expression syntax and macros.
 
 This project implements a compiler for Smooth.
 
