@@ -51,7 +51,9 @@
           (begin (display x) (newline) 'error-in-definition-of-this-symbol)
           (let ((val (assoc-ref internal-defines x #f)))
             (if (eq? val #f)
-              (begin (display (list 'unbound 'var_ x)) #f)
+              (begin
+                (die-gnose "Variable not defined: " px)
+                #f)
               (reduce-value internal-defines p-null val (cons x indefs)))))))))
 
 (define (assoc-append x1 x2)

@@ -591,8 +591,15 @@
       (write (car p) h)
       (parse-output-to-port h (cdr p)))))
 
-
 (define (display-error x)
   (display x (current-error-port)))
+                
+(define (die-gnose str x)
+  (let ((st  (parseobj-src-start x))
+         (len (parseobj-src-length x)))
+    (display str (current-error-port))
+    (print (parseobj-obj x) (current-error-port))
+    (display (if (eq? st #f) "" (string-append " at char:" (symbol->string st))) (current-error-port))
+    (newline (current-error-port))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
