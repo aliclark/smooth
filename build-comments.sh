@@ -2,7 +2,10 @@
 
 # builds target/comments.scm from src/comments.smc
 
-# must be run from either the 
+# TODO: .smo objects should contain the sha256 hash
+# of all dependencies used to build them
+# if any have changed then we rebuild
+# This is better than simply using mtime
 
 if [ ! -d ./src ]; then
   if [ ! -d ../src ]; then
