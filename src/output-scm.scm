@@ -95,18 +95,20 @@
 (define (extern-to-scm x)
   (if (not (= (length x) 2))
     "Extern wrong size"
-    (let ((tabl '((io_iocons  io_iocons)
+    (let ((tabl '((io_inttochar  io_inttochar)
+                   (io_chartoint io_chartoint)
+                   (io_inttochurch io_inttochurch)
+                   (io_churchtoint io_churchtoint)
+                   (io_iocons io_iocons)
                    (io_iocar  io_iocar)
                    (io_iocdr  io_iocdr)
                    (io_stdin  io_stdin)
                    (io_stdout io_stdout)
-                   (io_fputb  io_fputb)
-                   (io_fgetb  io_fgetb)
-                   (io_inttochurch io_inttochurch)
-                   (io_churchtoint io_churchtoint))))
+                   (io_fputch io_fputch)
+                   (io_fgetch io_fgetch))))
       (let ((v (assoc-ref tabl (cadr x) #f)))
         (if (eq? v #f)
-          "Extern not found"
+          (string-append "Extern not found " (symbol->string (cadr x)))
           (symbol->string v))))))
 
 (define (lookup-to-scm s)
@@ -123,82 +125,80 @@
         (#t                  (apply-to-scm  x))))
     (lookup-to-scm x)))
 
-;; Both gsi and guile buffer input. For some reason,
-;; gsi seems to do a separate write syscall for each char,
-;; even when calling (display "abc")
-;;
-;; Even so, calling once with the string seems to give
-;; a speed improvement of perhaps 20%
-;;
-;; guile now works but is slower than gsi, even with the bulk writes.
-;;
-;; Anyhow, sometime in the future we would like the user code
-;; to implement buffering, and not do it here.
+;; TODO: output buffering in user code, not native code
+;; str=(make-string k)
+;; (string->set! str i ch z)
+;; (fwrites port str z)
 
 (define preamble
-"(define (io_iocons v) (lambda (z) (cons v z)))
-(define (io_iocar x) (car x))
-(define (io_iocdr x) (cdr x))
+"(define (io_chartoint ch) (char->integer ch))
+(define (io_inttochar i)  (integer->char i))
 
 (define (io_inttochurch i)
-  (lambda (f)
-    (lambda (x)
-      (let loop ((k i) (c x))
-        (if (= k 0) c (loop (- k 1) (f c)))))))
+  (if (< i 0)
+    (io_inttochurch (* i -1))
+    (lambda (f)
+      (lambda (x)
+        (let loop ((k i) (c x))
+          (if (= k 0) c (loop (- k 1) (f c))))))))
 
 (define (io_churchtoint c) ((c (lambda (x) (+ x 1))) 0))
+
+(define (io_iocons v) (lambda (z) (cons v z)))
+(define (io_iocar x) (car x))
+(define (io_iocdr x) (cdr x))
 
 (define io_stdin  (current-input-port))
 (define io_stdout (current-output-port))
 
 ; This must not be called in parallel
-(define io_fgetb_tabl_size 1024)
-(define io_fgetb_tabl (make-string io_fgetb_tabl_size))
-(define io_fgetb_z 0)
-(define (io_fgetb f)
+(define io_fgetch_tabl_size 1024)
+(define io_fgetch_tabl (make-string io_fgetch_tabl_size))
+(define io_fgetch_z 0)
+(define (io_fgetch f)
   (lambda (z)
     (let ((nexz (+ z 1)))
-      (if (> io_fgetb_z z)
+      (if (> io_fgetch_z z)
 
         ;; result will be undefined if z hasn't actually
         ;; been used yet
-        ((io_iocons (char->integer (string-ref io_fgetb_tabl z))) nexz)
+        ((io_iocons (string-ref io_fgetch_tabl z)) nexz)
 
         (let* ((c (read-char f))
                 ; for the very time being we can get away
                 ; with using 0 instead of -1 for EOF
-                (ch  (if (eof-object? c) (integer->char 0) c))
-                (chi (char->integer ch)))
+                (ch  (if (eof-object? c) (integer->char 0) c)))
 
-          (if (>= z io_fgetb_tabl_size)
-            (let ((tmp (make-string io_fgetb_tabl_size)))
-              (set! io_fgetb_tabl_size (* io_fgetb_tabl_size 2))
-              (set! io_fgetb_tabl (string-append io_fgetb_tabl tmp)))
+          (if (>= z io_fgetch_tabl_size)
+            (let ((tmp (make-string io_fgetch_tabl_size)))
+              (set! io_fgetch_tabl_size (* io_fgetch_tabl_size 2))
+              (set! io_fgetch_tabl (string-append io_fgetch_tabl tmp)))
             'noop)
 
-          (set! io_fgetb_z nexz)
-          (string-set! io_fgetb_tabl z ch)
+          (set! io_fgetch_z nexz)
+          (string-set! io_fgetch_tabl z ch)
 
-          ((io_iocons chi) nexz))))))
+          ((io_iocons ch) nexz))))))
 
 ; This must not be called in parallel
-(define io_fputb_buffer '())
-(define io_fputb_z 0)
-(define (io_fputb f)
+(define io_fputch_buffer '())
+(define io_fputch_z 0)
+(define (io_fputch f)
   (lambda (c)
     (lambda (z)
       (let ((nexz (+ z 1)))
-        (if (> io_fputb_z z)
+        (if (> io_fputch_z z)
 
           ((io_iocons #f) nexz)
 
           (begin
-            (set! io_fputb_z nexz)
-            (set! io_fputb_buffer (cons (integer->char c) io_fputb_buffer))
+            (set! io_fputch_z nexz)
+            (set! io_fputch_buffer (cons c io_fputch_buffer))
             ((io_iocons #f) nexz)))))))
 
 (define (io_flush_output_buffer)
-  (display (list->string (reverse io_fputb_buffer))))
+  (display (list->string (reverse io_fputch_buffer))))
+
 ")
 
 (define postamble

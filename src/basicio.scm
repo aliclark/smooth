@@ -1,13 +1,15 @@
 
+(define inttochar   (extern io_inttochar))
+(define chartoint   (extern io_chartoint))
+(define inttochurch (extern io_inttochurch))
+(define churchtoint (extern io_churchtoint))
 (define iocons      (extern io_iocons))
 (define iocar       (extern io_iocar))
 (define iocdr       (extern io_iocdr))
 (define stdin       (extern io_stdin))
 (define stdout      (extern io_stdout))
-(define fgetb       (extern io_fgetb))
-(define fputb       (extern io_fputb))
-(define inttochurch (extern io_inttochurch))
-(define churchtoint (extern io_churchtoint))
+(define fgetch      (extern io_fgetch))
+(define fputch      (extern io_fputch))
 
 (define (return x) (lambda (r) ((iocons x) r)))
 
@@ -24,13 +26,13 @@
 
 (define >> (make->> >>=))
 
-(define getb (fgetb stdin))
-(define putb (fputb stdout))
+(define getch (fgetch stdin))
+(define putch (fputch stdout))
 
 (define getc
-  ((>>= getb)
+  ((>>= getch)
     (lambda (c)
-      (return (inttochurch c)))))
+      (return (inttochurch (chartoint c))))))
 
 (define (putc c)
-  (putb (churchtoint c)))
+  (putch (inttochar (churchtoint c))))
