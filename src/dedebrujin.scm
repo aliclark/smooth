@@ -1,10 +1,10 @@
 
 (load "base.scm")
 
-;; if we were to allow intermixing of debrujin indices and normal lambdas on the input,
-;; what happens if a normal lambda tries to redefine variable 0 ?
+;; We allow intermixing of debrujin and normal format.
+;; If a numeric-looking variable is defined, result is undefined.
 ;;
-;; for now, just assume all lambdas are in debrujin form
+;; When counting debrujin depth, only the debrujin lambdas count.
 
 (define (symbol->number x) (string->number (symbol->string x)))
 
@@ -28,11 +28,19 @@
                     (cons (list 0 sym)
                       (map (lambda (p) (list (+ (car p) 1) (cadr p))) vari))))
                 px)))
-          'error-not-debrujin)
+
+          (parseobj-sel 2
+            (lambda (exp) (dedebrujin exp vari))
+            px))
+
         (if (reserved-symbol-obj? px)
           px
+
           (parseobj-mk (map (lambda (x) (dedebrujin x vari)) x) (parseobj-propsid px))))
-      (parseobj-mk (assoc-ref vari (symbol->number x) #f) (parseobj-propsid px)))))
+
+      (if (reserved-symbol-sym? px)
+        px
+        (parseobj-mk (assoc-ref vari (symbol->number x) #f) (parseobj-propsid px))))))
 
 (define parse-phase-dedebrujin
   (parseobj-convf

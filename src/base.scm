@@ -163,9 +163,19 @@
 (define (reserved-symbol-type? x t) (and (reserved-symbol? x) (eq? (reserved-symbol-type x) t)))
 (define (non-resvd-list? x) (and (p-list? x) (not (reserved-symbol? x))))
 
+(define (reserved-symbol-sym? px)
+  (let ((x (parseobj-obj px)))
+    (if (symbol? x)
+      (let* ((sx (symbol->string x))
+              (len (string-length sx)))
+        (and (> len 4)
+          (string=? (substring sx 0 2) "__")
+          (string=? (substring sx (- len 2) len) "__")))
+      #f)))
+
 (define (reserved-symbol-obj? py)
   (let ((y (parseobj-obj py)))
-    (if (list? y)
+    (if (and (list? y) (> (length y) 0))
       (let* ((px (car y))
              (x (parseobj-obj px)))
         (if (symbol? x)
@@ -405,6 +415,10 @@
         '() ; error
         (parseobj-mk (parseobj-sel-inner i lam x) (parseobj-propsid px))))))
 
+(define (parseobj-map lam px)
+  (let ((x (parseobj-obj px)))
+    (parseobj-mk (map lam x) (parseobj-props px))))
+
 (define (parseobj-lambda? px)
   (let ((x (parseobj-obj px)))
     (and (list? x)
@@ -635,6 +649,24 @@
 
 ;; This is the null pass, used by the first and last compiler modules.
 (define (parse-phase-null p) p)
+
+; replace all occurrences of v in exp with arg,
+; except those shadowed by a lambda
+(define (subst exp v arg)
+  (let ((x (parseobj-obj exp)))
+    (if (list? x)
+      (if (reserved-form-type? exp '__extern__ 2)
+        exp
+        (if (reserved-form-type? exp '__lambda__ 3)
+          (let ((s (parseobj-obj (cadr x))))
+            (if (eq? s v)
+              exp
+              (parseobj-sel 2 (lambda (b) (subst b v arg)) exp)))
+          (parseobj-mk (map (lambda (y) (subst y v arg)) x)
+            (parseobj-props exp))))
+      (if (eq? x v)
+        arg
+        exp))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Output phases
