@@ -417,7 +417,7 @@
 
 (define (parseobj-map lam px)
   (let ((x (parseobj-obj px)))
-    (parseobj-mk (map lam x) (parseobj-props px))))
+    (parseobj-mk (map lam x) (parseobj-propsid px))))
 
 (define (parseobj-lambda? px)
   (let ((x (parseobj-obj px)))
@@ -663,7 +663,7 @@
               exp
               (parseobj-sel 2 (lambda (b) (subst b v arg)) exp)))
           (parseobj-mk (map (lambda (y) (subst y v arg)) x)
-            (parseobj-props exp))))
+            (parseobj-propsid exp))))
       (if (eq? x v)
         arg
         exp))))

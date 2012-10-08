@@ -200,7 +200,7 @@
       (if (symbol? x)
         (fsym x)
         (apply flist x))
-      (parseobj-props px))))
+      (parseobj-propsid px))))
 
 (define (reassemble px f) (reassemble-cond px f f))
 
@@ -229,7 +229,7 @@
         px
         (let ((n (symbol->number x)))
           (parseobj-mk (number->symbol (if (> n depth) (- n 1) n))
-            (parseobj-props px)))))))
+            (parseobj-propsid px)))))))
 
 (define (upwards vs)
   (map
