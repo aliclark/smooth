@@ -44,7 +44,7 @@
           px
           (parseobj-mk
             (p-map (lambda (z) (reduce-value internal-defines shadows z indefs)) x)
-            (parseobj-props px))))
+            (parseobj-propsid px))))
       (if (contains? shadows x)
         px
         (if (contains? indefs x)
@@ -73,6 +73,15 @@
     '()
     xs))
 
+;; this will still leave empty begin forms behind which is a bit ugly
+(define (remove-defines xs)
+  (map
+    (lambda (x)
+      (if (reserved-form-type? x '__begin__ 0)
+        (parseobj-conv remove-defines x)
+        x))
+    (filter (lambda (x) (not (reserved-form-type? x '__define__ 3))) xs)))
+
 (define parse-phase-filter
   (parseobj-convf
     (lambda (xs)
@@ -81,11 +90,14 @@
           (if (equal? m #f)
             (parse-error
               (string-append "Main symbol (" (symbol->string main-symbol) ") not present"))
-            (list
+
+            (cons
               (parseobj-mk
-                (list (parseobj-mk '__start__ '())
+                (list (parseobj-mk '__start__ parseprops-null)
                   (reduce-value internal-defines p-null m (list main-symbol)))
-                '()))))))))
+                parseprops-null)
+
+              (remove-defines xs))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Main

@@ -54,7 +54,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (macropobj x) (parseobj-mk x '()))
+(define (macropobj x) (parseobj-mk x parseprops-null))
 
 ;; This runs into the age-old problem of referring to the wrong 'cons and the wrong 'nil
 ;; when they are shadowed.
@@ -83,14 +83,14 @@
 ;; (s ...) -> (__s__ ...)
 (define (specialnym-macro sx args props)
   (let* ((s (parseobj-obj sx))
-          (sp (parseobj-props sx))
+          (sp (parseobj-propsid sx))
           (syn (string->symbol (string-append "__" (symbol->string s) "__"))))
     (parseobj-mk (cons (parseobj-mk syn sp) args) props)))
 
 ;; (load "...") -> (__load__ ...)
 (define (load-macro sx args props)
   (let* ((s (parseobj-obj sx))
-          (sp (parseobj-props sx))
+          (sp (parseobj-propsid sx))
           (syn (string->symbol (string-append "__" (symbol->string s) "__")))
           (fstr (symbol->string (parseobj-obj (car args))))
           (fsym (string->symbol (string-append (substring fstr 1 (- (string-length fstr) 5)) ".smo"))))
@@ -104,7 +104,7 @@
 ;; (let ()          exp) -> exp
 (define (let-macro args props)
   (let ((vs (parseobj-obj (car args)))
-         (vp (parseobj-props (car args))))
+         (vp (parseobj-propsid (car args))))
     (if (null? vs)
       (cadr args)
       (let ((a (parseobj-obj (car vs))))
@@ -130,7 +130,7 @@
 ;; (lambda ()      exp) -> exp
 (define (lambda-macro args props)
   (let ((al (parseobj-obj (car args)))
-         (ap (parseobj-props (car args))))
+         (ap (parseobj-propsid (car args))))
     (if (null? al)
       (cadr args)
       (parseobj-mk
@@ -145,7 +145,7 @@
 ;; (define f exp)       -> (__define__ f exp)
 (define (def-macro args props)
   (let ((v (parseobj-obj (car args)))
-         (vp (parseobj-props (car args))))
+         (vp (parseobj-propsid (car args))))
     (parseobj-mk
       (if (list? v)
         (list (macropobj '__define__)
@@ -157,7 +157,7 @@
 
 (define (expand px)
   (let* ((x (parseobj-obj px))
-          (props (parseobj-props px))
+          (props (parseobj-propsid px))
           (mac (parseobj-obj (car x)))
           (args (cdr x)))
     (cond
@@ -193,16 +193,18 @@
           ((or (eq? c '__lambda__) (eq? c '__define__))
             (parseobj-mk
               (list (car x) (cadr x) (macexpand (caddr x)))
-              (parseobj-props px)))
+              (parseobj-propsid px)))
           ((eq? c '__begin__)
             (parseobj-mk
               (cons (car x) (map macexpand (cdr x)))
-              (parseobj-props px)))
+              (parseobj-propsid px)))
+          ((reserved-symbol-obj? px)
+            px)
           ((= (length x) 2)
             (parseobj-mk
               (list (macexpand (car x)) (macexpand (cadr x)))
-              (parseobj-props px)))
-          (#t px)))
+              (parseobj-propsid px)))
+          (#t (begin (display-error "unknown expression size") px))))
       px)))
 
 ;; TODO: some sort of validation
@@ -217,6 +219,7 @@
   (parseobj-convf
     (lambda (x)
       (map macexpand x))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Main

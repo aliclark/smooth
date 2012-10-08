@@ -104,6 +104,12 @@
       #t
       (list-contains? (cdr xs) x))))
 
+(define (take-first f xs nf)
+  (if (null? xs)
+    nf
+    (let ((c (car xs)))
+      (if (f c) c (take-first f (cdr xs) nf)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Domain specific library code
 
@@ -318,26 +324,74 @@
 
 (define (parseobj-mk obj props) (list obj props))
 
-(define (parseobj-obj   p) (car p))
-(define (parseobj-props p) (cadr p))
+(define (parseobj-obj     p) (car p))
+(define (parseobj-propsid p) (cadr p))
 
-(define (parseobj-set p k v)
+(define (parseobj-props propstab p)
+  (if (= (parseobj-propsid p) parseprops-null)
+    '()
+    (assoc-ref propstab (parseobj-propsid p) #f)))
+
+(define (parseobj-set propstab p k v)
   (if (not (symbol? k))
     (begin (display 'bad-parseobj-key-type) '()) ; there is a problem
-    (parseobj-mk (parseobj-obj p) (assoc-set (parseobj-props p) k v))))
+    (parseprops-set propstab (parseobj-propsid p) (assoc-set (parseobj-props propstab p) k v))))
 
-(define (parseobj-ref p k nf)
-  (assoc-ref (parseobj-props p) k nf))
+(define (parseobj-ref propstab p k nf)
+  (assoc-ref (parseobj-props propstab p) k nf))
 
 (define (parseobj-src-start  p) (parseobj-ref p 'source-start  #f))
 (define (parseobj-src-length p) (parseobj-ref p 'source-length #f))
 
-(define (parseobj-create s l obj)
-  (parseobj-set (parseobj-set (parseobj-mk obj '())
-                  'source-start (number->symbol s)) 'source-length (number->symbol l)))
+(define (parseprops-set propstab id p)
+  (assoc-set propstab id p))
 
-(define (parseobj-conv lam x) (parseobj-mk (lam (parseobj-obj x)) (parseobj-props x)))
+;; FIXME: this will reset the counter to 1 between program invocations
+;; - something we absolutely don't want.
+(define parseprops-null 0)
+(define parseobj-counter 1)
+(define (parseobj-freshid!)
+  (let ((c parseobj-counter))
+    (set! parseobj-counter (+ parseobj-counter 1))
+    c))
+
+(define (parseprops-create s l)
+  (assoc-set
+    (assoc-set '() 'source-start (number->symbol s))
+    'source-length (number->symbol l)))
+
+(define (parseobj-conv  lam x) (parseobj-mk (lam (parseobj-obj x)) (parseobj-propsid x)))
 (define (parseobj-convf lam) (lambda (x) (parseobj-conv lam x)))
+
+;;; TODO:
+;;; A next step would be to automatically assign each object
+;;; a unique properties entry given its position in the program (eg. left to right, back to front)
+;;; A list of "null" entries can be maintained where we don't have any info
+;;; for that object.
+;;;
+;;; This allows us to pass the intermediary program code with just a single extra properties table
+;;; and no goop cluttering up the code!
+;;; The parseobj's are reconstructed and deconstructed at read and write time, with O(n) cost.
+
+(define (parseobj-propstable py)
+  (cadar
+    (take-first
+      (lambda (px) (reserved-form-type? px '__propstab__ 2))
+      (parseobj-obj py)
+      '(((__propstab__ 0) ()) 0))))
+
+;; for each entry in b, generate a fresh entry for use in a
+(define (propstable-remap a b)
+  (let loop ((rv '()) (remb b))
+    (if (null? remb)
+      rv
+      (loop (cons (list (caar remb) (parseobj-freshid!)) rv) (cdr remb)))))
+
+(define (propstable-add a b rmap)
+  (let loop ((rv a) (remmap rmap))
+    (if (null? remmap)
+      rv
+      (loop (assoc-set rv (caar remmap) (assoc-ref b (caar remmap) #f)) (cdr remmap)))))
 
 (define (parseobj-sel-inner i lam x)
   (if (= i 0)
@@ -349,7 +403,7 @@
     (if (list? x)
       (if (<= (length x) i)
         '() ; error
-        (parseobj-mk (parseobj-sel-inner i lam x) (parseobj-props px))))))
+        (parseobj-mk (parseobj-sel-inner i lam x) (parseobj-propsid px))))))
 
 (define (parseobj-lambda? px)
   (let ((x (parseobj-obj px)))
@@ -429,10 +483,10 @@
 (define (is-whitespace? c)
   (or (char=? c cspace) (or (char=? c cnewline) (char=? c ctab))))
 
-;; (list parseobj remcl len)
-(define (parse-read-list cl startn)
+;; (list (list parseobj remcl len) propstab)
+(define (parse-read-list cl startn propstabin)
   ; (cdr cl) moves past the open paren
-  (let loop ((remcl (cdr cl)) (len 1) (rv '()))
+  (let loop ((remcl (cdr cl)) (len 1) (rv '()) (propstab propstabin))
     (if (null? remcl)
       '() ; this is an error - no autoclosing
 
@@ -446,19 +500,24 @@
                  (lnsofar (+ len fln)))
 
           (if (parse-close-paren? (caar firstl))
-            (list (parseobj-create startn (+ lnsofar 1) (reverse rv))
-              (cdr fcl)
-              (+ lnsofar 1))
+            (let ((id (parseobj-freshid!)))
+              (list
+                (list (parseobj-mk (reverse rv) id) (cdr fcl) (+ lnsofar 1))
+                (parseprops-set propstab id (parseprops-create startn (+ lnsofar 1)))))
 
             (let* ((readf (if (parse-open-paren? (car fcl)) parse-read-list parse-read-symbol))
-                   (pl (readf fcl (+ startn lnsofar))))
-                (loop (cadr pl) (+ lnsofar (caddr pl)) (cons (car pl) rv))))))))))
+                    (plx (readf fcl (+ startn lnsofar) propstab))
+                    (pl (car plx)))
+                (loop (cadr pl) (+ lnsofar (caddr pl)) (cons (car pl) rv) (cadr plx))))))))))
 
-;; (list parseobj remcl len)
-(define (parse-read-symbol cl startn)
+;; (list (list parseobj remcl len) propstab)
+(define (parse-read-symbol cl startn propstab)
   (let loop ((remcl cl) (n 0) (rv '()))
     (if (or (null? remcl) (parse-white-space? (car remcl)) (parse-paren? (car remcl)))
-      (list (parseobj-create startn n (p-list-to-p-symbol (reverse rv))) remcl n)
+      (let ((id (parseobj-freshid!)))
+        (list
+          (list (parseobj-mk (p-list-to-p-symbol (reverse rv)) id) remcl n)
+          (parseprops-set propstab id (parseprops-create startn n))))
       (loop (cdr remcl) (+ n 1) (cons (car remcl) rv)))))
 
 ;; returns list starting with valid non-whspace-ch at head
@@ -472,34 +531,46 @@
           (loop (+ n 1) (cdr remcl))
           (list remcl n))))))
 
-;; returns (list parseobj remcl len)
-(define (read-charlist-obj cl startn)
+;; returns (list (list parseobj remcl len) propstab)
+(define (read-charlist-obj cl startn propstab)
   (let ((c (car cl)))
     (if (parse-open-paren? c)
-      (parse-read-list cl startn)
+      (parse-read-list cl startn propstab)
       (if (parse-close-paren? c)
         '() ; error list closed early
-        (parse-read-symbol cl startn)))))
+        (parse-read-symbol cl startn propstab)))))
 
 ;;; TODO: use leadsp to return the whitespace gap count
 
-;; returns (list (list parseobj remcl len) leadsp)
-(define (read-charlist-next cl startn)
+;; returns (list (list parseobj remcl len) leadsp propstab)
+(define (read-charlist-next cl startn propstab)
   (let ((firstl (first-nonwhitespace-ch cl)))
     (if (null? firstl)
       '()
-      (list (read-charlist-obj (car firstl) (+ startn (cadr firstl))) (cadr firstl)))))
+      (let ((obj (read-charlist-obj (car firstl) (+ startn (cadr firstl)) propstab)))
+        (list (car obj) (cadr firstl) (cadr obj))))))
 
 ;; returns parseobj
 ;; parseobj = a single parseobj listing all objects in the file
 (define (read-charlist-as-parseobj cl)
-  (let loop ((allobjs '()) (remcl cl) (startn 0))
-    (let ((objremgot (read-charlist-next remcl startn)))
+  (let loop ((allobjs '()) (remcl cl) (startn 0) (propstab '()))
+    (let ((objremgot (read-charlist-next remcl startn propstab)))
       (if (null? objremgot)
-        (parseobj-create 0 (length cl) (reverse allobjs))
+        (let ((id parseprops-null))
+          (parseobj-mk
+            (cons
+              (parseobj-mk
+                (list (parseobj-mk '__propstab__ parseprops-null)
+                  (assoc-set propstab id
+                    (assoc-set
+                      (assoc-set '() 'source-start 0)
+                      'source-length (number->symbol (length cl)))))
+                parseprops-null)
+              (reverse allobjs))
+            id))
         (let ((objrem (car objremgot))
               (leadsp (cadr objremgot)))
-          (loop (cons (car objrem) allobjs) (cadr objrem) (+ startn (caddr objrem) leadsp)))))))
+          (loop (cons (car objrem) allobjs) (cadr objrem) (+ startn (caddr objrem) leadsp) (caddr objremgot)))))))
 
 (define (read-charlist-from-port p)
   (let loop ((l '()))
@@ -541,11 +612,19 @@
 ;;;
 ;;; Thus we strip parseobj's out, leaving just the parseobj-val.
 
-(define (parse-strip-meta p)
+(define (parse-strip-inner p)
   (let ((v (parseobj-obj p)))
     (if (p-list? v)
-      (p-map parse-strip-meta v)
+      (p-map parse-strip-inner v)
       v)))
+
+(define (parse-strip-meta p)
+  (parse-strip-inner
+    (parseobj-mk
+      (filter
+        (lambda (x) (not (reserved-form-type? x '__propstab__ 2)))
+        (parseobj-obj p))
+      parseprops-null)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Compiler passes
