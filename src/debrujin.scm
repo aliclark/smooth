@@ -29,7 +29,7 @@
     (if (list? x)
       (if (reserved-form-type? px '__lambda__ 3)
         (parseobj-sel 1
-          (lambda (v) (parseobj-mk '__debrujin__ (parseobj-props v)))
+          (lambda (v) (parseobj-mk '__debrujin__ (parseobj-propsid v)))
           (parseobj-sel 2
             (lambda (exp)
               (debrujin exp
@@ -38,8 +38,8 @@
             px))
         (if (reserved-symbol-obj? px)
           px
-          (parseobj-mk (map (lambda (x) (debrujin x vari)) x) (parseobj-props px))))
-      (parseobj-mk (number->symbol (assoc-ref vari x #f)) (parseobj-props px)))))
+          (parseobj-mk (map (lambda (x) (debrujin x vari)) x) (parseobj-propsid px))))
+      (parseobj-mk (number->symbol (assoc-ref vari x #f)) (parseobj-propsid px)))))
 
 (define parse-phase-debrujin
   (parseobj-convf

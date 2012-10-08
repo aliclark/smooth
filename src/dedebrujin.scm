@@ -21,7 +21,7 @@
         (if (eq? (parseobj-obj (cadr x)) '__debrujin__)
           (let ((sym (mygensym)))
             (parseobj-sel 1
-              (lambda (v) (parseobj-mk sym (parseobj-props v)))
+              (lambda (v) (parseobj-mk sym (parseobj-propsid v)))
               (parseobj-sel 2
                 (lambda (exp)
                   (dedebrujin exp
@@ -31,8 +31,8 @@
           'error-not-debrujin)
         (if (reserved-symbol-obj? px)
           px
-          (parseobj-mk (map (lambda (x) (dedebrujin x vari)) x) (parseobj-props px))))
-      (parseobj-mk (assoc-ref vari (symbol->number x) #f) (parseobj-props px)))))
+          (parseobj-mk (map (lambda (x) (dedebrujin x vari)) x) (parseobj-propsid px))))
+      (parseobj-mk (assoc-ref vari (symbol->number x) #f) (parseobj-propsid px)))))
 
 (define parse-phase-dedebrujin
   (parseobj-convf

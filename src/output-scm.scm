@@ -207,9 +207,13 @@
 ")
 
 (define (simplescm-output p l)
-  ; for now assume the last item is the expression
-  (let* ((expr (cadr (p-last l)))
-         (thecode (expr-to-scm expr)))
+  (let* ((st
+           (take-first
+             (lambda (x) (and (list? x) (> (length x) 0) (eq? (car x) '__start__)))
+             l
+             "No __start__ found"))
+          (expr (cadr st))
+          (thecode (expr-to-scm expr)))
     (display (string-append preamble thecode postamble) p)
     (newline p)))
 

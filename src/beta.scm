@@ -20,7 +20,7 @@
               exp
               (parseobj-sel 2 (lambda (b) (subst b v arg)) exp)))
           (parseobj-mk (map (lambda (y) (subst y v arg)) x)
-            (parseobj-props exp))))
+            (parseobj-propsid exp))))
       (if (eq? x v)
         arg
         exp))))
@@ -28,7 +28,7 @@
 (define (reduce-full-end px x fx)
   (parseobj-mk
     (list fx (reduce-form (cadr x)))
-    (parseobj-props px)))
+    (parseobj-propsid px)))
 
 (define (reduce-apply px)
   (let ((x (parseobj-obj px)))
