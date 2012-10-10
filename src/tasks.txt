@@ -1,0 +1,108 @@
+
+These tasks are available for anyone to tackle in a topic branch. The final
+merge commit message into master should be very similar to the text here.
+
+Note: the tasks are listed in no particular order.
+
+---
+
+Universal property encoding table
+
+Compute the property IDs for each source expression on the fly based on the position that it appears in the source file.
+
+The ID's start at 1 with the innermost, leftmost symbol, then move along to the innermost rightmost, and so on.
+
+eg. ((a b (c d) e) (f g)) h
+
+becomes {({({({a 1} {b 2} {({c 3} {d 4}) 5} {e 6}) 7} {({f 8} {g 9}) 10}) 11} {h 12} 13)}
+
+--- 
+
+Symbol strings
+
+Decide on a symbol syntax which allows all printable chars and possibly
+non-printable code points too.
+
+The standard symbol format should still be available, but with some way to
+express other characters not currently expressible in a symbol (most obviously,
+the space character).
+
+The minimal way to do this would be to have a backslash character which simply
+ensures the following character will be part of the symbol.
+
+However using delimiters such as quote marks as well as the backspace would
+have the benefit that much fewer characters require backspacing, eg. space
+would no longer need backspacing. Another potential delimiter character is the
+pipe symbol, which is used in Scheme's symbol format.
+
+A complication to the simple backspace rule above might be to allow \xH3C5
+style characters to insert an arbitrary code-point. The above rule may also be
+confusing, since backspace followed by a newline in a file conventionally means
+"ignore the newline", whereas if we aren't using delimeters, this would
+necessarily be the only way to insert a newline into a symbol, unless we
+modified the format to also understand \n as newline.
+
+Personally, I think a very simple quotation-based string-symbol syntax is the
+best route forward.
+
+A major consideration that must first be made is whether or not this will limit
+a user's ability to use quotes for their own string syntax. At current, the
+only real syntax that cannot be repurposed is the parentheses.
+
+Perhaps string-symbols must be written like so: (__symbol__ "content here...")
+
+There is still potential for confusion there if a user things they can make a
+macro synonym for __symbol__ to something like strsym.
+
+---
+
+Dearitisation
+
+Currently each application must be exactly one argument per function, and it is
+a syntax error to wrap a single expression in parenthesis.
+
+The internals should continue to see it this way, but it would be nice to expose an extra pass to the user so they can write each application as a single functor with 0 or more arguments.
+
+---
+
+Rearitisation
+
+We would like to ability to call external functions with more than 1 argument
+in a single call, for efficiency reasons. The __extern__ syntax should be
+extended to accept an arity value, eg. (__extern__ fputb 3)
+
+A neat way to do this is that immediately after dearitisation we loop through,
+wrapping each extern in a lambda of the correct arity. This guarantees that
+closures are formed only when needed, since they will be evaluated out at beta
+reduce time if possible.
+
+---
+
+Closed expression lazy execution
+
+Currently the deduplication phase will also hoist out duplicated values from
+lambdas, even where it is not certain any of the lambdas will ever be executed.
+These should only be evaluated once if needed, but not otherwise.
+
+Moreover, we would actually like all expressions in closures to be evaluated in
+this way (except where the expression is already defined by a containing
+let-form). This time the benefit would be in the form of caching the values of
+function applications, so that if the closure is called again, we can return
+the value from the cache. In this way, only expressions that directly use the
+innermost variable will need to be recomputed.
+
+---
+
+Asynchronous IO
+
+The interface for asynchronous IO is more restricted, in that one can implement
+blocking IO within an asynchronous IO interface, but one cannot implement
+asynchronous IO within a blocking IO interface.
+
+For this reason, asynchronous IO is how code is recommended to be written,
+especially since Smooth will never have threading. (Smooth will never have
+threading because A: threading is not simple, it is horrendously complex, and
+B: processes are a better way to express multi-tasking regardless.) 
+
+---
+
