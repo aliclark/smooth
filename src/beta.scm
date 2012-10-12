@@ -7,24 +7,6 @@
     (set! counter (+ counter 1))
     (string->symbol (string-append "__g" (number->string c) "__"))))
 
-; replace all occurrences of v in exp with arg,
-; except those shadowed by a lambda
-(define (subst exp v arg)
-  (let ((x (parseobj-obj exp)))
-    (if (list? x)
-      (if (reserved-form-type? exp '__extern__ 2)
-        exp
-        (if (reserved-form-type? exp '__lambda__ 3)
-          (let ((s (parseobj-obj (cadr x))))
-            (if (eq? s v)
-              exp
-              (parseobj-sel 2 (lambda (b) (subst b v arg)) exp)))
-          (parseobj-mk (map (lambda (y) (subst y v arg)) x)
-            (parseobj-propsid exp))))
-      (if (eq? x v)
-        arg
-        exp))))
-
 (define (reduce-full-end px x fx)
   (parseobj-mk
     (list fx (reduce-form (cadr x)))
