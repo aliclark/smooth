@@ -1,6 +1,9 @@
 
 (load "base.scm")
 
+;; TODO: It would also be nice to apply against any lambdas which return an argument
+;; since there is no risk of non-termination there.
+
 (define counter 0)
 (define (mygensym)
   (let ((c counter))
