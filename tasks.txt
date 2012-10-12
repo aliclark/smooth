@@ -1,20 +1,30 @@
 
-These tasks are available for anyone to tackle in a topic branch. The final
-merge commit message into master should be very similar to the text here.
+These tasks are available for anyone to tackle in a topic branch.
+
+Please indicate if you are working on a task.
 
 Note: the tasks are listed in no particular order.
+
+===
+
+Not started
 
 ---
 
 Universal property encoding table
 
-Compute the property IDs for each source expression on the fly based on the position that it appears in the source file.
+Compute the property IDs for each source expression on the fly based on the
+position that it appears in the source file.
 
-The ID's start at 1 with the innermost, leftmost symbol, then move along to the innermost rightmost, and so on.
+The ID's start at 1 with the innermost, leftmost symbol, then move along to the
+innermost rightmost, and so on.
 
 eg. ((a b (c d) e) (f g)) h
 
-becomes {({({({a 1} {b 2} {({c 3} {d 4}) 5} {e 6}) 7} {({f 8} {g 9}) 10}) 11} {h 12} 13)}
+becomes
+
+{({({({a 1} {b 2} {({c 3} {d 4}) 5} {e 6}) 7} {({f 8} {g 9}) 10}) 11} {h 12}
+13)}
 
 --- 
 
@@ -61,7 +71,9 @@ Dearitisation
 Currently each application must be exactly one argument per function, and it is
 a syntax error to wrap a single expression in parenthesis.
 
-The internals should continue to see it this way, but it would be nice to expose an extra pass to the user so they can write each application as a single functor with 0 or more arguments.
+The internals should continue to see it this way, but it would be nice to
+expose an extra pass to the user so they can write each application as a single
+functor with 0 or more arguments.
 
 ---
 
@@ -93,6 +105,24 @@ innermost variable will need to be recomputed.
 
 ---
 
+Optimistic evaluation
+
+We want to try to evaluate expressions within lambda expressions, using call by
+need, in the hopes that some will be reduced fully. First step is to focus on
+evaluating all expressions which contain a macro function. Only once these have
+been fully evaluated away can we either stop evaluating, or carry on expanding
+the other expressions.
+
+This process of evaluation would usually not halt if left running. Moreover, it
+is impossible to detect whether this will happen, as an instance of the halting
+problem.
+
+The solution is to impose a time-bound on how long we spend evaluating
+expressions, and use a round-robin scheme so progress can be made on some
+expressions, even if others are not making progress.
+
+---
+
 Asynchronous IO
 
 The interface for asynchronous IO is more restricted, in that one can implement
@@ -103,6 +133,184 @@ For this reason, asynchronous IO is how code is recommended to be written,
 especially since Smooth will never have threading. (Smooth will never have
 threading because A: threading is not simple, it is horrendously complex, and
 B: processes are a better way to express multi-tasking regardless.) 
+
+IO should be performed asynchronously in an event loop, and computationally
+heavy tasks should be shoved off to another process.
+
+io:  poll, libev, or reimplement libev in Smooth
+
+cpu: fork, exec, pipe and async io write to the process' stdin, async io read
+from its stdout. Define a native numcores() function to determine how many of
+these processes to spawn.
+
+---
+
+Native code deduction
+
+It is likely that the output code will end up with lots of inefficient lambda
+code in it.
+
+(>>= (native_getsomeint)
+  (fn (x)
+    (native_dosomething (native_churchtoint (square (native_inttochurch x))))))
+
+The worry is that square will perform much less efficiently than could be
+achieved using native code.
+
+We would like to detect when lambda code looks like the native equivalent of
+integer multiplication.
+
+(>>= (native_getsomeint)
+  (fn (x)
+    (native_dosomething (native_mult x x))))
+
+Integer operations in particular are the most needy place for this type of
+optimisation, because their native operations do not involve memory structures,
+and complete in O(1) with respect to the size of the integer. This differs from
+church encodings, which are at least O(log n), and maintain the memory
+structure of closures.
+
+Other types of data structure, such as linked lists will see much smaller gain
+from this type of optimisation, since both native and lambda encodings use
+roughly the same memory structures and have the same big-O efficiency. It is
+even preferable not to try to apply this optimisation in those cases, because
+it would distract from the real solution of making the lambda execution more
+performant.
+
+If it is not possible to sufficiently detect and perform this optimisation, it
+may simply become the case that Smooth users tend to write their integer code
+using native functions, and the compiler will know how to evaluate those
+expressions at compile time.
+
+This task will likely share some ideas from the Generalised deduplications
+task, since both are about looking for patterns in lambda code.
+
+---
+
+Generalised deduplications
+
+Detect patterns in code which can be deduplicated with respect to a function
+argument. This is different from normal deduplication, which looks for exact
+expression matches. Here we want to find expressions which differ only by a
+slight amount, and automatically write a function to describe the similarity of
+code. Is this equivalent to checking whether two functions are equal? If so,
+it's not possible to implement fully.
+
+---
+
+Module system
+
+The module system will follow a very similar concept to the current "define"
+style of naming that it replaces, in that all references to the defined
+name/module are directly replaced by the value it refers to.
+
+In the case of modules, the expression (import "/dir/filepath") is replaced directly
+by the single expression contained within the file "/dir/filepath".
+
+In this way, module is very much a misnomer, since the concept is generalised
+away from first class modules to first class expressions, and both (lambda x x)
+and (extern "putc") are valid modules in their own right.
+
+The import statement should just accept an absolute file path as its argument.
+If it is desired to express imports over relative paths or URLs, or for both
+Windows and Unix, then an extra abstraction should be used to insert the
+correct paths at compile time.
+
+---
+
+Caching build system
+
+A nice way to cache build results would be to only recompile if the SHA of the
+source code has changed. It would be really nice to go even further and keep
+track of the individual expressions that had changed, and then be able to work
+out how to compile just what is necessary.
+
+Another potential idea is that if we see dependency injection, like ((import
+"a") (import "b)), then not only do we cache the compilation of expression in
+file "a", we can also compile "a", with "b" already applied to it.
+
+The source-length and source-offset properties may help to keep track of where
+symbols have been used, but it would also be necessary to keep track of places
+where unused source code have been removed, since they might not have been
+removed if they had been defined differently.
+
+---
+
+===
+
+In progress
+
+---
+
+Deduplication
+https://github.com/aliclark/smooth/tree/implement_dedup
+
+Referential transparency allows us to see more clearly when expressions refer
+to the same values, since any expressions which are syntactically the same must
+have the same value.
+
+Putting these in let-expressions will firstly reduce the size of the program
+code, and secondly allow the expression to be evaluated as high up in the scope
+chain as possible. Doing this minimises the number of times the expression is
+re-evaluated to what is absolutely necessary.
+
+---
+
+===
+
+Scratch notes
+
+---
+
+Run-time strings at compile time
+
+Currently, there are two cases to date where evaluating code at compile time
+helps us to perform useful tasks, these are first class macros, and the vel-cro
+static typing system.
+
+To what extent can we utilize this for other phases?
+
+For example, might we want to calculate an "import" filename via lambda-code?
+
+This would require the import phase to understand a fixed pre-defined notion of
+what a string lambda-encoding looks like.
+
+It would also rely on some earlier phase like the reader module to understand
+how to convert a utf8 string of characters into the lambda encoding.
+
+One reason it might be a bad idea for the import pass is that we would normally
+like imports to be completely evaluated before macros can be evaluated in beta
+reduction.
+
+---
+
+Are first class macros good?
+
+First class macros seem like a cool idea, and very elegantly solve the problem
+of hygeine by allowing macros to close over dependency functions, but are they
+sufficient?
+
+The main hitch is that we cannot use a macro until we have loaded it into the
+current scope via __import__, and bound it to a symbol via __lambda__
+
+---
+
+Native code at compile time
+
+What happens if a macro lambda running at compile-time would like to use a
+native function? It seems the distinction would have to be clear.
+
+Do we provide a symbol __mextern__ to refer to an external function provided by
+the macro pass?
+
+How might this work with IO monads - try to use the same IO monad somehow? a
+combined compile and run time monad? separate IO monads?
+
+Since the iocons would be a different impl, so would the bind impl. So yes they
+would be different monads.
+
+Is it a reasonable thing to want to pull a DB schema at macro time and generate
+the code for it?
 
 ---
 
