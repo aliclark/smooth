@@ -40,14 +40,14 @@ the space character).
 The minimal way to do this would be to have a backslash character which simply
 ensures the following character will be part of the symbol.
 
-However using delimiters such as quote marks as well as the backspace would
-have the benefit that much fewer characters require backspacing, eg. space
-would no longer need backspacing. Another potential delimiter character is the
+However using delimiters such as quote marks as well as the backslash would
+have the benefit that much fewer characters require backslashing, eg. space
+would no longer need backslashing. Another potential delimiter character is the
 pipe symbol, which is used in Scheme's symbol format.
 
-A complication to the simple backspace rule above might be to allow \xH3C5
+A complication to the simple backslash rule above might be to allow \xH3C5
 style characters to insert an arbitrary code-point. The above rule may also be
-confusing, since backspace followed by a newline in a file conventionally means
+confusing, since backslash followed by a newline in a file conventionally means
 "ignore the newline", whereas if we aren't using delimeters, this would
 necessarily be the only way to insert a newline into a symbol, unless we
 modified the format to also understand \n as newline.
