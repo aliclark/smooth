@@ -329,6 +329,12 @@ intentially adds let-bindings for useful things like "let" and "mget".
 
 ---
 
+===
+
+Not-goals
+
+---
+
 Native code at compile time
 
 What happens if a macro lambda running at compile-time would like to use a
@@ -346,5 +352,12 @@ would be different monads.
 Is it a reasonable thing to want to pull a DB schema at macro time and generate
 the code for it?
 
----
+There is some level of disconnect trying to pass in an argument to a
+macro that needs to be evaluated at compile time.
 
+I think it may be best to say that non-pure first-class macros are off
+the cards. For this sort of behaviour we should revert to a very dumb
+mechanism of first having programs generate other Smooth files, then
+import'ing those at compile time.
+
+---
