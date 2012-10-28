@@ -9,23 +9,6 @@ Note: the tasks are listed in no particular order.
 
 Not started
 
----
-
-Universal property encoding table
-
-Compute the property IDs for each source expression on the fly based on the
-position that it appears in the source file.
-
-The ID's start at 1 with the innermost, leftmost symbol, then move along to the
-innermost rightmost, and so on.
-
-eg. ((a b (c d) e) (f g)) h
-
-becomes
-
-{({({({a 1} {b 2} {({c 3} {d 4}) 5} {e 6}) 7} {({f 8} {g 9}) 10}) 11} {h 12}
-13)}
-
 --- 
 
 Symbol strings
@@ -257,6 +240,24 @@ Putting these in let-expressions will firstly reduce the size of the program
 code, and secondly allow the expression to be evaluated as high up in the scope
 chain as possible. Doing this minimises the number of times the expression is
 re-evaluated to what is absolutely necessary.
+
+---
+
+Universal property encoding table
+https://github.com/aliclark/smooth/tree/parseprops-unified
+
+Compute the property IDs for each source expression on the fly based on the
+position that it appears in the source file.
+
+The ID's start at 1 with the innermost, leftmost symbol, then move along to the
+innermost rightmost, and so on.
+
+eg. ((a b (c d) e) (f g)) h
+
+becomes
+
+{({({({a 1} {b 2} {({c 3} {d 4}) 5} {e 6}) 7} {({f 8} {g 9}) 10}) 11} {h 12}
+13)}
 
 ---
 
