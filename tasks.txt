@@ -64,6 +64,10 @@ Perhaps string-symbols must be written like so: (__symbol__ "content here...")
 There is still potential for confusion there if a user things they can make a
 macro synonym for __symbol__ to something like strsym.
 
+Best just go with a standard string behaviour, with extra shortcuts
+like \n \t and \xFF93 and which uses pipe character for
+delimeters. This leaves quotation marks available for the end-user.
+
 ---
 
 Dearitisation
