@@ -288,7 +288,7 @@ reduction.
 
 ---
 
-Are first class macros good?
+Are first class macros good? (probably yes)
 
 First class macros seem like a cool idea, and very elegantly solve the problem
 of hygeine by allowing macros to close over dependency functions, but are they
@@ -296,6 +296,36 @@ sufficient?
 
 The main hitch is that we cannot use a macro until we have loaded it into the
 current scope via __import__, and bound it to a symbol via __lambda__
+
+There is another niggle in that macros themselves use library
+functions, and those library functions can be more elegantly written
+using those macros.
+
+A good solution to that is the same as the one used to help write the
+Smooth compiler in Smooth - cache an output of an earlier compilation
+and use it for bootstrapping.
+
+Not sure how to specify to use the cached version of the code, or
+whether the compiler should automatically used the cached version when
+it realises there is a cycle (how can we guarantee it is
+up-to-date?). Also prefer not to give file compilation preferential
+treatment to compilation of other strings.
+
+For the __import__ + __lambda__ problem, might need to rely on a
+read-syntax here, or a very primitive "module" macro provided by a
+separate macro system/pass.
+
+Here we have some boiler-plate, followed by a macro-call which
+intentially adds let-bindings for useful things like "let" and "mget".
+
+((__lambda__ stdmodule
+   (stdmodule (bool pair)
+     (let ((true  (mget bool true))
+           (false (mget bool true))
+           (cons  (mget pair cons)))
+       (cons t f)))
+ )
+ (__import__ stdmodule.smc))
 
 ---
 
