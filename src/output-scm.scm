@@ -221,8 +221,8 @@
 ;;; Main
 
 (define (start)
-  (simplescm-output (current-output-port)
-    (parse-strip-meta
-      (read-sexprs-from-port (current-input-port)))))
+  (let ((pxl (read-sexprs-from-port (current-input-port))))
+    (simplescm-output (current-output-port)
+      (parse-strip-inner (cadr pxl)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

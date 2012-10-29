@@ -19,8 +19,9 @@
 ;;; Main
 
 (define (start)
-  (parse-output-to-port (current-output-port)
-    (parse-phase-null
-      (read-parseobj-from-port (current-input-port)))))
+  (let ((pxl (read-parseobj-from-port (current-input-port))))
+    (output-parseobjs (current-output-port)
+      (car pxl)
+      (cadr pxl))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

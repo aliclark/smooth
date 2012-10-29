@@ -110,6 +110,15 @@
     (let ((c (car xs)))
       (if (f c) c (take-first f (cdr xs) nf)))))
 
+(define (part f xs)
+  (if (null? xs)
+    (list (list) (list))
+    (let ((a (car xs))
+           (r (part f (cdr xs))))
+      (if (f a)
+        (list (cons a (car r)) (cadr r))
+        (list (car r) (cons a (cadr r)))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Domain specific library code
 
@@ -556,18 +565,15 @@
   (let loop ((allobjs '()) (remcl cl) (startn 0) (propstab '()))
     (let ((objremgot (read-charlist-next remcl startn propstab)))
       (if (null? objremgot)
-        (let ((id parseprops-null))
-          (parseobj-mk
-            (cons
-              (parseobj-mk
-                (list (parseobj-mk '__propstab__ parseprops-null)
-                  (assoc-set propstab id
-                    (assoc-set
-                      (assoc-set '() 'source-start 0)
-                      'source-length (number->symbol (length cl)))))
-                parseprops-null)
-              (reverse allobjs))
-            id))
+        (let ((id (parseobj-freshid!)))
+          (list
+            (assoc-set propstab id
+              (assoc-set
+                (assoc-set '() 'source-start 0)
+                'source-length (number->symbol (length cl))))
+
+            (parseobj-mk (reverse allobjs) id)))
+
         (let ((objrem (car objremgot))
               (leadsp (cadr objremgot)))
           (loop (cons (car objrem) allobjs) (cadr objrem) (+ startn (caddr objrem) leadsp) (caddr objremgot)))))))
@@ -582,13 +588,35 @@
 (define (read-parseobj-from-port p)
   (read-charlist-as-parseobj (read-charlist-from-port p)))
 
-(define (read-sexprs-from-port p)
-;  (parse-strip-meta (read-parseobj-from-port p)))
+;; We should make enough of __propstab__ be a parseobj to be recognisable.
+;; ie. {({__propstab__ 0} ...) 0}
+;; Either that or we should just keep the propstab separate from the code.
+(define (instantiate-parseobjs-from-table t l)
+  (instantiate-null-parseobjs l))
 
-  (let ((x (read p)))
-    (let ((props (read p)))
-      (parseobj-mk x props))))
-    
+(define (instantiate-null-parseobjs x)
+  (if (list? x)
+    (parseobj-mk (map instantiate-null-parseobjs x) parseprops-null)
+    (parseobj-mk x parseprops-null)))
+
+;; Given a list of s-expressions which may or may not contain
+;; a single parseprops table at the top level,
+;; Turn all other expressions (apart from the global parseprops table)
+;; into parseobj's, using the parseprops table.
+;; If there is no parseprops table, just insert null parseobj id for each.
+(define (instantiate-parseobjs l)
+  (let ((p (part (lambda (x) (and (list? x) (= (length x) 2) (eq? (car x) '__propstab__))) l)))
+    (if (= (length (car p)) 1)
+      (let ((t (cadaar p)))
+        (list t (instantiate-parseobjs-from-table t (cadr p))))
+      (list '() (instantiate-null-parseobjs l)))))
+
+(define (read-sexprs-from-port p)
+  (let loop ((rv '()))
+    (let ((x (read p)))
+      (if (eof-object? x)
+        (instantiate-parseobjs (reverse rv))
+        (loop (cons x rv))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Parse tree error checking
@@ -667,8 +695,27 @@
   (if (null? p)
     'done
     (begin
-      (write (car p) h)
-      (parse-output-to-port h (cdr p)))))
+      (write p h))))
+
+(define (output-parseobj-list port l)
+  (if (null? l)
+    'done
+    (begin
+      (newline port)
+      (write (parse-strip-inner (car l)) port)
+      (output-parseobj-list port (cdr l)))))
+
+(define (refresh-table pt px)
+  pt)
+
+;; TODO: fix up the ID's based on news parseobj syntax positions
+;; then output the new table along with the raw code
+(define (output-parseobjs port pt px)
+  (let ((ptnew (refresh-table pt px)))
+    (if (null? ptnew)
+      'noop
+      (write (list '__propstab__ ptnew) port))
+    (output-parseobj-list port (parseobj-obj px))))
 
 (define (display-error x)
   (display x (current-error-port)))

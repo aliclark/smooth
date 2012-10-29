@@ -52,6 +52,7 @@
         xs))))
 
 (define (start)
-  (parse-output-to-port (current-output-port)
-    (parse-phase-debrujin
-      (read-sexprs-from-port (current-input-port)))))
+  (let ((pxl (read-sexprs-from-port (current-input-port))))
+    (output-parseobjs (current-output-port)
+      (car pxl)
+      (parse-phase-debrujin (cadr pxl)))))
