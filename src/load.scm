@@ -35,12 +35,11 @@
       (assoc-ref rmap (parseobj-propsid px) 0))))
 
 ;; returns (list px pt)
-(define (load-with-table-file py pt fnmsym)
+(define (load-with-table-file py pt2 pt fnmsym)
 
   ;; what we want to do is merge all of these objects' properties
   ;; into the current file's properties table.
-  (let* ((pt2 (parseobj-propstable py))
-          (rmap (propstable-remap pt pt2))
+  (let* ((rmap (propstable-remap pt pt2))
           (ptrv (propstable-add pt pt2 rmap)))
 
     (let ((rvs (foldr
@@ -48,8 +47,8 @@
                    (let ((rv (perform-loads (parseobj-remap x rmap) (cadr acc))))
                      (list (cons (car rv) (car acc)) (cadr rv))))
                  (list (list) ptrv)
-                 (filter (lambda (x) (not (reserved-form-type? x '__propstab__ 2))) (parseobj-obj py)))))
-           (list (parseobj-mk (car rvs) (parseobj-propsid py)) (cadr rvs)))))
+                 (parseobj-obj py))))
+      (list (parseobj-mk (car rvs) (parseobj-propsid py)) (cadr rvs)))))
 
 ;; a load with table which does not need to merge props into pt
 (define (load-with-table py pt)
@@ -68,7 +67,8 @@
       (let ((carx (parseobj-obj (car x))))
         (if (eq? carx '__load__)
           (let* ((fnmsym (parseobj-obj (cadr x)))
-                  (filepxl (load-with-table-file (read-sexprs-from-port (open-input-file (symbol->string fnmsym))) pt fnmsym))
+                  (loaded (read-sexprs-from-port (open-input-file (symbol->string fnmsym))))
+                  (filepxl (load-with-table-file (cadr loaded) (car loaded) pt fnmsym))
                   (filepx  (car filepxl))
                   (filelpx (parseobj-obj filepx)))
 
@@ -85,25 +85,12 @@
             (list px pt))))
       (list px pt))))
 
-(define (parse-phase-load py)
-  (let* ((pt (parseobj-propstable py))
-          (rv (load-with-table py pt)))
-    (parseobj-conv
-      (lambda (xs)
-        (map
-          (lambda (px)
-            (if (reserved-form-type? px '__propstab__ 2)
-              (parseobj-sel 1 (lambda (x) (cadr rv)) px)
-              px))
-          xs))
-      (car rv))))  
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Main
 
 (define (start)
-  (parse-output-to-port (current-output-port)
-    (parse-phase-load
-      (read-sexprs-from-port (current-input-port)))))
+  (let* ((pxl (read-sexprs-from-port (current-input-port)))
+         (bl (load-with-table (cadr pxl) (car pxl))))
+    (output-parseobjs (current-output-port) (cadr bl) (car bl))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

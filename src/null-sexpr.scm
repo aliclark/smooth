@@ -2,5 +2,7 @@
 (load "base.scm")
 
 (define (start)
-  (parse-output-to-port (current-output-port)
-    (read-sexprs-from-port (current-input-port))))
+  (let ((pxl (read-sexprs-from-port (current-input-port))))
+    (output-parseobjs (current-output-port)
+      (car pxl)
+      (cadr pxl))))
