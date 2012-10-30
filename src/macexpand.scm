@@ -220,13 +220,13 @@
     (lambda (x)
       (map macexpand x))))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Main
 
 (define (start)
-  (parse-output-to-port (current-output-port)
-    (parse-phase-filter
-      (read-sexprs-from-port (current-input-port)))))
+  (let ((pxl (read-sexprs-from-port (current-input-port))))
+    (output-parseobjs (current-output-port)
+      (car pxl)
+      (parse-phase-filter (cadr pxl)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
