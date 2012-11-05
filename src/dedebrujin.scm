@@ -34,7 +34,12 @@
             px))
 
         (if (reserved-symbol-obj? px)
-          px
+
+          ;;; FIXME: ugly !!!! chnage to proper gensyms.
+          (if (string=? (substring (symbol->string (parseobj-obj (car x))) 0 3) "__d")
+            (parseobj-mk (map (lambda (x) (dedebrujin x vari)) x) (parseobj-propsid px))
+
+            px)
 
           (parseobj-mk (map (lambda (x) (dedebrujin x vari)) x) (parseobj-propsid px))))
 

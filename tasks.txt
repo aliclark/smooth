@@ -9,6 +9,20 @@ Note: the tasks are listed in no particular order.
 
 Not started
 
+---
+
+Create proper gensym objects
+
+Currently the code just uses things like __dNN__ or __xNN__ to create
+new symbols. This is very brittle. Change for a proper list based
+syntax like (__gensym__ d NN) or (__gensym__ x NN)
+
+This unfortunately may slow down the substition method which currently
+is able to do a simple eq? for symbol equality.
+
+An alternative would be __genysm__d_NN__ but that would require special
+casing in the code which is not worth it.
+
 --- 
 
 Symbol strings
