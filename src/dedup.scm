@@ -234,8 +234,9 @@
       (if (reserved-symbol-sym? px)
         px
         (let ((n (symbol->number x)))
-          (parseobj-mk (number->symbol (if (> n depth) (- n 1) n))
-            (parseobj-propsid px)))))))
+          (if (> n depth)
+            (parseobj-mk (number->symbol (- n 1)) (parseobj-propsid px))
+            px))))))
 
 (define (upwards vs)
   (map
