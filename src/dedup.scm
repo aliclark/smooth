@@ -339,6 +339,7 @@
         xs))))
 
 (define (start)
-  (parse-output-to-port (current-output-port)
-    (parse-phase-dedup
-      (read-sexprs-from-port (current-input-port)))))
+  (let ((pxl (read-sexprs-from-port (current-input-port))))
+    (output-parseobjs (current-output-port)
+      (car pxl)
+      (parse-phase-dedup (cadr pxl)))))
