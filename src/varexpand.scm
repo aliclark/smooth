@@ -38,7 +38,7 @@
       (if (reserved-form-type? px '__lambda__ 3)
         (parseobj-sel 2
           (lambda (y)
-            (reduce-value internal-defines (ensure-contains (parseobj-obj (cadr x)) shadows) y indefs))
+            (reduce-value internal-defines (cons (parseobj-obj (cadr x)) shadows) y indefs))
           px)
         (if (reserved-form-type? px '__extern__ 2)
           px
