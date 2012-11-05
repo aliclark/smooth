@@ -238,12 +238,17 @@
             (parseobj-mk (number->symbol (- n 1)) (parseobj-propsid px))
             px))))))
 
+(define (upward v) (if (number? v) (if (= v 0) 0 (- v 1)) #f))
+
+(define (upward-globalising v) (if (and (number? v) (= v 0)) #f (upward v)))
+
 (define (upwards vs)
   (map
     (lambda (x)
       (list (car x)
         (decrement-closing (cadr x) 0)
-        (let ((y (caddr x))) (if (eq? y #f) #f (- y 1)))))
+        (upward (caddr  x))
+        (map upward (cadddr x))))
     vs))
 
 (define (part f xs)
@@ -255,7 +260,10 @@
         (list (cons a (car r)) (cadr r))
         (list (car r) (cons a (cadr r)))))))
 
-(define (mincountzero? x) (and (number? (caddr x)) (= (caddr x) 0)))
+(define (local-usage? x)
+  (or
+    (and (number? (caddr  x)) (= (caddr  x) 0))
+    (contains? (cadddr x) 0)))
 
 (define (symbol->number x) (string->number (symbol->string x)))
 
@@ -265,33 +273,33 @@
     (set! counter (+ counter 1))
     (string->symbol (string-append "__d" (number->string c) "__"))))
 
-(define (mincount x y)
+(define (minrefcount x y)
   (if (eq? x #f)
     y
     (if (eq? y #f)
       x
       (min x y))))
 
-(define (maxcount x y)
-  (if (eq? x #f)
+(define (merge-lists x y)
+  (if (null? x)
     y
-    (if (eq? y #f)
-      x
-      (max x y))))
+    (merge-lists (cdr x) (ensure-contains (car x) y))))
 
 ;; Returns a list containing:
 ;; 1: the modified expression,
 ;; 2: a list of expressions to propogate: (list x) x=(list __dx__ expression minclosedness)
-;; 3: the minclosedcount of this expression
-;; 4: the maxclosedcount of this expression
+;; 3: the minrefcount  of this expression (the absolute closest bound variable)
+;; 4: list of the mincloscounts of this expression (the closest bound variable that is not locally bound, #f otherwise)
 (define (dedup-extract px)
   (let ((x (parseobj-obj px)))
     (if (list? x)
       (if (reserved-form-type? px '__lambda__ 3)
         (let* ((e (dedup-extract (caddr x)))
-                (vs (part mincountzero? (cadr e)))
+                (vs (part local-usage? (cadr e)))
                 (sym (mygensym))
-                (mn (if (or (eq? (caddr e) #f) (= (caddr e) 0)) #f (- (caddr e) 1))))
+                (minref  (upward-globalising (caddr e)))
+                (minclos (map upward-globalising (cadddr e))))
+
           (list
             (macropobj sym)
 
@@ -303,32 +311,33 @@
                     ;; because expressions at different lambda levels
                     ;; cannot possibly reference each other
                     (make-letex (reverse (car vs)) (car e))))
-                mn)
+                minref
+                minclos)
               (upwards (cadr vs)))
 
-            mn
-            ;; we want non-closures to effectively become globals
-            (if (or (eq? (cadddr e) #f) (= (cadddr e) 0)) #f (- (cadddr e) 1))))
+            minref
+            minclos))
 
         (if (reserved-form-type? px '__extern__ 2)
-          (list px (list) #f #f)
+          (list px (list) #f (list #f))
 
           (if (reserved-symbol-obj? px)
             ;; currently we don't allow expressions to move up
             ;; if we don't know what they do
-            (list px (list) 0 0)
+            (list px (list) 0 (list 0))
 
             (let* ((e1 (dedup-extract (car x)))
                    (e2 (dedup-extract (cadr x)))
                    (sym (mygensym))
-                   (mn (mincount (caddr e1) (caddr e2))))
+                   (minref  (minrefcount  (caddr  e1) (caddr  e2)))
+                   (minclos (merge-lists (cadddr e1) (cadddr e2))))
 
               (list (macropobj sym)
-                (cons (list sym (macropobj (list (car e1) (car e2))) mn) (append (cadr e1) (cadr e2)))
-                mn
-                (maxcount (cadddr e1) (cadddr e2)))))))
+                (cons (list sym (macropobj (list (car e1) (car e2))) minref minclos) (append (cadr e1) (cadr e2)))
+                minref
+                minclos)))))
 
-      (list px (list) (symbol->number x) (symbol->number x)))))
+      (list px (list) (symbol->number x) (list (symbol->number x))))))
 
 (define parse-phase-dedup
   (parseobj-convf
