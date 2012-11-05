@@ -209,10 +209,16 @@
   (let ((x (parseobj-obj px)))
     (if (list? x)
       (if (reserved-form-type? px '__lambda__ 3)
-        (parseobj-sel 2
-          (lambda (exp)
-            (decrement-closing exp (+ depth 1)))
-          px)
+        (if (eq? (parseobj-obj (cadr x)) '__debrujin__)
+          (parseobj-sel 2
+            (lambda (exp)
+              (decrement-closing exp (+ depth 1)))
+            px)
+
+          (parseobj-sel 2
+            (lambda (exp)
+              (decrement-closing exp depth))
+            px))
 
         (if (reserved-form-type? px '__extern__ 2)
           px

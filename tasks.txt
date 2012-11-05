@@ -23,6 +23,16 @@ is able to do a simple eq? for symbol equality.
 An alternative would be __genysm__d_NN__ but that would require special
 casing in the code which is not worth it.
 
+---
+
+Separate debrujin notation
+
+Currently we use (__lambda__ __debrujin__ exp) to indicate debrujin
+notation. This confuses the lambda notation and makes it easier for
+bugs to creep in.
+
+The new notation should be (__debrujin__ exp)
+
 --- 
 
 Symbol strings
