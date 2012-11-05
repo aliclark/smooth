@@ -474,7 +474,10 @@
             (list-contains? sl (parseobj-obj (parseobj-head x))))
           obj)))))
 
-(define ensure-contains cons)
+(define (ensure-contains x xs)
+  (if (contains? xs x)
+    xs
+    (cons x xs)))
 
 (define (contains? l x)
   (if (null? l) false (if (equal? (head l) x) true (contains? (tail l) x))))
