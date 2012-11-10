@@ -242,6 +242,21 @@
                   (car stuff)))
               (foldr (lambda (x acc) (subst acc x (macropobj to))) (cadr stuff) renames))))))))
 
+(define (make-letex-inner vs exp)
+  (if (null? vs)
+    exp
+
+    (if (and (= (length vs) 1) (eq? (caar vs) (parseobj-obj exp)))
+      (cadar vs)
+
+      (let ((va (car vs)))
+        (macropobj
+          (list
+            (macropobj
+              (list (macropobj '__lambda__) (macropobj (car va))
+                (make-letex-inner (cdr vs) exp)))
+            (cadr va)))))))
+
 ;; The vs must be in an order such that each item does not depend on
 ;; the definition of a following item.
 (define (make-letex vs exp)
@@ -301,13 +316,7 @@
                 (vs (car vsexp))
                 (exp (cadr vsexp)))
 
-          (let ((va (car vs)))
-            (macropobj
-              (list
-                (macropobj
-                  (list (macropobj '__lambda__) (macropobj (car va))
-                    (make-letex (cdr vs) exp)))
-                (cadr va)))))))))
+          (make-letex-inner vs exp))))))
 
 (define (reassemble-cond px flist fsym)
   (let ((x (parseobj-obj px)))
