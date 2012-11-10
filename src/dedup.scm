@@ -286,18 +286,21 @@
   (if (null? vs)
     exp
 
-    (let ((gs (group-expressions vs)))
-      (let* ((vsexp (perform-renames gs exp))
-              (vs (car vsexp))
-              (exp (cadr vsexp)))
+    (if (and (= (length vs) 1) (eq? (caar vs) (parseobj-obj exp)))
+      (cadar vs)
 
-        (let ((va (car vs)))
-          (macropobj
-            (list
-              (macropobj
-                (list (macropobj '__lambda__) (macropobj (car va))
-                  (make-letex (cdr vs) exp)))
-              (cadr va))))))))
+      (let ((gs (group-expressions vs)))
+        (let* ((vsexp (perform-renames gs exp))
+                (vs (car vsexp))
+                (exp (cadr vsexp)))
+
+          (let ((va (car vs)))
+            (macropobj
+              (list
+                (macropobj
+                  (list (macropobj '__lambda__) (macropobj (car va))
+                    (make-letex (cdr vs) exp)))
+                (cadr va)))))))))
 
 (define (reassemble-cond px flist fsym)
   (let ((x (parseobj-obj px)))
