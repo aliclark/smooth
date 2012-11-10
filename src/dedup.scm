@@ -155,6 +155,86 @@
 ;           (pt (points-to a)))
 ;      
 
+(define (unified-equal? px py defs)
+  (let ((x (parseobj-obj px))
+         (y (parseobj-obj py)))
+
+    (if (and (list? x) (list? y))
+
+      (if (reserved-form-type? px '__lambda__ 3)
+        (if (reserved-form-type? py '__lambda__ 3)
+
+          (if (eq? (parseobj-obj (cadr x)) '__debrujin__)
+            (if (eq? (parseobj-obj (cadr y)) '__debrujin__)
+              (unified-equal? (caddr x) (caddr y) defs)
+              #f)
+
+            (if (eq? (parseobj-obj (cadr x)) (parseobj-obj (cadr y)))
+              (unified-equal? (caddr x) (caddr y) defs)
+              (unified-equal? (caddr x) (caddr y) (assoc-set defs (parseobj-obj (cadr x)) (parseobj-obj (cadr y))))))
+
+          #f)
+
+        (if (reserved-form-type? px '__extern__ 2)
+          (equal? x y)
+
+          (if (reserved-symbol-obj? px)
+            (equal? x y)
+
+            (and (= (length x) (length y))
+              (unified-equal? (car x) (car y) defs)
+              (unified-equal? (cadr x) (cadr y) defs)))))
+
+      (if (and (symbol? x) (symbol? y))
+
+        (if (reserved-symbol-sym? px)
+
+          ;;; FIXME: ugly !!!! change to proper gensyms.
+          (if (string=? (substring (symbol->string x) 0 3) "__d")
+
+            (or (eq? x y) (eq? (assoc-ref defs x '()) y))
+
+            (eq? x y))
+
+          (eq? x y))
+
+        #f))))
+
+(define (group-expressions vs)
+  (if (null? vs)
+    '()
+    (let* ((a (car vs))
+            (aexp (cadr a))
+            (rvs (cdr vs))
+            (parvs (part (lambda (x) (unified-equal? aexp (cadr x) '())) rvs)))
+      (cons (cons a (car parvs)) (group-expressions (cadr parvs))))))
+
+;; now for any groups that have more than 1 member,
+;; we rename all but the head vars to be the same as the head
+;; apply this renaming in all of the rest of the groups,
+;; and in the main body expression itself
+;; (though i think it should be the case that the expression only appears once)
+(define (perform-renames gs exp)
+  (if (null? gs)
+    (list '() exp)
+    (let ((stuff (perform-renames (cdr gs) exp)))
+      (let ((g (car gs)))
+        (if (= (length g) 1)
+          (list (cons (car g) (car stuff)) (cadr stuff))
+
+          (let ((to (caar g))
+                 (renames (map car (cdr g))))
+            (list
+              (cons (car g)
+                (map
+                  (lambda (v)
+                    (list (car v)
+                      (foldr (lambda (x acc) (subst acc x (macropobj to))) (cadr v) renames)
+                      (caddr v)
+                      (cadddr v)))
+                  (car stuff)))
+              (foldr (lambda (x acc) (subst acc x (macropobj to))) (cadr stuff) renames))))))))
+
 ;; The vs must be in an order such that each item does not depend on
 ;; the definition of a following item.
 (define (make-letex vs exp)
@@ -174,25 +254,50 @@
   ;; An element is never equivalent to its parent* or child*
   ;; but can be equivalent to anything else.
   ;; Even in that case, the tree must be the same shape.
-  ;; The ideal is to match largest objects possible.
 
+  ;; The ideal is to match largest objects possible.
   ;; We should still be matching from the leaves first,
   ;; just being as greedy as possible.
+  ;; >
+  ;; Actually, it shouldn't matter too much if we first
+  ;; make equivalence with a couple of leaves and then
+  ;; make equivalence with their parents.
+  ;; It's probably easier, because if 3 branches start matching,
+  ;; one might stop matching earlier, so this needs to be handled.
 
   ;; Starting with all the leaf elements, we group by equality.
   ;; we can immediately discard those which do not match,
   ;; as well as the entirety of the path to the root node
   ;; (but not other branches of that root node).
 
+  ;; After deduplicating, we want to replace any lone appearances of a
+  ;; variable with the value itself, and then after that look at doing
+  ;; a conditional-use cache
+
+  ;; for each variable in the let form we work out if it has been
+  ;; renamed and if so to what.
+  ;; if it has been renamed then we need to update all parts of the code.
+  ;; the one which was defined earliest is the winner, because that has
+  ;; most potential to be used in snippets of code.
+
+  ;; To begin with we only consider (E E) and (lambda debrujin E)
+  ;; where E is an extern or variable lookup.
+
   (if (null? vs)
     exp
-    (let ((va (car vs)))
-      (macropobj
-        (list
+
+    (let ((gs (group-expressions vs)))
+      (let* ((vsexp (perform-renames gs exp))
+              (vs (car vsexp))
+              (exp (cadr vsexp)))
+
+        (let ((va (car vs)))
           (macropobj
-            (list (macropobj '__lambda__) (macropobj (car va))
-              (make-letex (cdr vs) exp)))
-          (cadr va))))))
+            (list
+              (macropobj
+                (list (macropobj '__lambda__) (macropobj (car va))
+                  (make-letex (cdr vs) exp)))
+              (cadr va))))))))
 
 (define (reassemble-cond px flist fsym)
   (let ((x (parseobj-obj px)))
