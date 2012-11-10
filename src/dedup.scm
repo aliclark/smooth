@@ -257,6 +257,11 @@
                 (make-letex-inner (cdr vs) exp)))
             (cadr va)))))))
 
+;; This is efficient enough for the global let-form of cat.smc,
+;; which has 133 expressions initially.
+;; It is not efficient enough for the global let-form of comments.smc,
+;; which has 2802 expressions initially.
+
 ;; The vs must be in an order such that each item does not depend on
 ;; the definition of a following item.
 (define (make-letex vs exp)
