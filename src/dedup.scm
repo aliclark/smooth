@@ -176,10 +176,10 @@
           #f)
 
         (if (reserved-form-type? px '__extern__ 2)
-          (equal? x y)
+          (equal? (parse-strip-inner px) (parse-strip-inner py))
 
           (if (reserved-symbol-obj? px)
-            (equal? x y)
+            (equal? (parse-strip-inner px) (parse-strip-inner py)))
 
             (and (= (length x) (length y))
               (unified-equal? (car x) (car y) defs)
