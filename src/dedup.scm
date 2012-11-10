@@ -179,7 +179,14 @@
           (equal? (parse-strip-inner px) (parse-strip-inner py))
 
           (if (reserved-symbol-obj? px)
-            (equal? (parse-strip-inner px) (parse-strip-inner py)))
+
+            ;;; FIXME: ugly !!!! chnage to proper gensyms.
+            (if (string=? (substring (symbol->string (parseobj-obj (car x))) 0 3) "__d")
+              (and (= (length x) (length y))
+                (unified-equal? (car x) (car y) defs)
+                (unified-equal? (cadr x) (cadr y) defs))
+
+              (equal? (parse-strip-inner px) (parse-strip-inner py)))
 
             (and (= (length x) (length y))
               (unified-equal? (car x) (car y) defs)
