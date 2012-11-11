@@ -216,6 +216,24 @@
             (parvs (part (lambda (x) (unified-equal? aexp (cadr x) '())) rvs)))
       (cons (cons a (car parvs)) (group-expressions (cadr parvs))))))
 
+; replace all occurrences of vs in exp with arg,
+; except those shadowed by a lambda
+(define (subst-all exp vs arg)
+  (let ((x (parseobj-obj exp)))
+    (if (list? x)
+      (if (reserved-form-type? exp '__extern__ 2)
+        exp
+        (if (reserved-form-type? exp '__lambda__ 3)
+          (let ((s (parseobj-obj (cadr x))))
+            (if (contains? vs s)
+              exp
+              (parseobj-sel 2 (lambda (b) (subst-all b vs arg)) exp)))
+          (parseobj-mk (map (lambda (y) (subst-all y vs arg)) x)
+            (parseobj-propsid exp))))
+      (if (contains? vs x)
+        arg
+        exp))))
+
 ;; now for any groups that have more than 1 member,
 ;; we rename all but the head vars to be the same as the head
 ;; apply this renaming in all of the rest of the groups,
@@ -236,7 +254,7 @@
                 (map
                   (lambda (v)
                     (list (car v)
-                      (foldr (lambda (x acc) (subst acc x (macropobj to))) (cadr v) renames)
+                      (subst-all (cadr v) renames (macropobj to))
                       (caddr v)
                       (cadddr v)))
                   (car stuff)))
