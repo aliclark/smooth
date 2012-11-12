@@ -9,6 +9,17 @@ Note: the tasks are listed in no particular order.
 Not started
 
 -------------------------------------------------------------------------------
+Load into let-forms
+
+Currently the load phase pastes expression values wherever they are
+used, leading to duplication. To fix this, values should be defined in
+a let-form surrounding the expressions that use it.
+
+It does not matter so much if an expression is only used once, but for
+consistency and efficiency these should probably also be placed in
+let-forms.
+
+-------------------------------------------------------------------------------
 Symbol strings
 
 Decide on a symbol syntax which allows all printable chars and possibly
