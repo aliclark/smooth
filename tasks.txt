@@ -9,17 +9,6 @@ Note: the tasks are listed in no particular order.
 Not started
 
 -------------------------------------------------------------------------------
-Load into let-forms
-
-Currently the load phase pastes expression values wherever they are
-used, leading to duplication. To fix this, values should be defined in
-a let-form surrounding the expressions that use it.
-
-It does not matter so much if an expression is only used once, but for
-consistency and efficiency these should probably also be placed in
-let-forms.
-
--------------------------------------------------------------------------------
 Symbol strings
 
 Decide on a symbol syntax which allows all printable chars and possibly
@@ -236,6 +225,18 @@ Putting these in let-expressions will firstly reduce the size of the program
 code, and secondly allow the expression to be evaluated as high up in the scope
 chain as possible. Doing this minimises the number of times the expression is
 re-evaluated to what is absolutely necessary.
+
+-------------------------------------------------------------------------------
+Load into let-forms
+https://github.com/aliclark/smooth/tree/load-into-let
+
+Currently the load phase pastes expression values wherever they are
+used, leading to duplication. To fix this, values should be defined in
+a let-form surrounding the expressions that use it.
+
+It does not matter so much if an expression is only used once, but for
+consistency and efficiency these should probably also be placed in
+let-forms.
 
 ===============================================================================
 Scratch notes
