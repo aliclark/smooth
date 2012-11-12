@@ -243,24 +243,6 @@ re-evaluated to what is absolutely necessary.
 
 ---
 
-Universal property encoding table
-https://github.com/aliclark/smooth/tree/parseprops-unified
-
-Compute the property IDs for each source expression on the fly based on the
-position that it appears in the source file.
-
-The ID's start at 1 with the innermost, leftmost symbol, then move along to the
-innermost rightmost, and so on.
-
-eg. ((a b (c d) e) (f g)) h
-
-becomes
-
-{({({({a 1} {b 2} {({c 3} {d 4}) 5} {e 6}) 7} {({f 8} {g 9}) 10}) 11} {h 12}
-13)}
-
----
-
 ===
 
 Scratch notes
@@ -360,5 +342,29 @@ I think it may be best to say that non-pure first-class macros are off
 the cards. For this sort of behaviour we should revert to a very dumb
 mechanism of first having programs generate other Smooth files, then
 import'ing those at compile time.
+
+---
+
+===
+
+Done
+
+---
+
+Universal property encoding table
+https://github.com/aliclark/smooth/tree/parseprops-unified
+
+Compute the property IDs for each source expression on the fly based on the
+position that it appears in the source file.
+
+The ID's start at 1 with the innermost, leftmost symbol, then move along to the
+innermost rightmost, and so on.
+
+eg. ((a b (c d) e) (f g)) h
+
+becomes
+
+{({({({a 1} {b 2} {({c 3} {d 4}) 5} {e 6}) 7} {({f 8} {g 9}) 10}) 11} {h 12}
+13)}
 
 ---
