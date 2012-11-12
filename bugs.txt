@@ -1,8 +1,11 @@
+
 ===============================================================================
 Open
+
 -------------------------------------------------------------------------------
 1: Property IDs are not updated on output
 
 If expressions have moved from their original position then we need to update
 the props table when outputting the code
+
 -------------------------------------------------------------------------------
