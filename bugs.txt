@@ -1,4 +1,8 @@
 
+These bugs are available for anyone to tackle in a topic branch.
+
+Please indicate if you are working on a bug.
+
 ===============================================================================
 Open
 
