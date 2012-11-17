@@ -324,7 +324,6 @@ Done
 
 -------------------------------------------------------------------------------
 Universal property encoding table
-https://github.com/aliclark/smooth/tree/parseprops-unified
 
 Compute the property IDs for each source expression on the fly based on the
 position that it appears in the source file.
