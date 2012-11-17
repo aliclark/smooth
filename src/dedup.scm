@@ -260,21 +260,6 @@
                   (car stuff)))
               (foldr (lambda (x acc) (subst acc x (macropobj to))) (cadr stuff) renames))))))))
 
-(define (make-letex vs exp)
-  (if (null? vs)
-    exp
-
-    (if (and (= (length vs) 1) (eq? (caar vs) (parseobj-obj exp)))
-      (cadar vs)
-
-      (let ((va (car vs)))
-        (macropobj
-          (list
-            (macropobj
-              (list (macropobj '__lambda__) (macropobj (car va))
-                (make-letex (cdr vs) exp)))
-            (cadr va)))))))
-
 ;; This is efficient enough for the global let-form of cat.smc,
 ;; which has 133 expressions initially.
 ;; It is not efficient enough for the global let-form of comments.smc,
