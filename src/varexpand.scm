@@ -72,7 +72,7 @@
 (define (get-defines tab vars) (map (lambda (v) (list v (assoc-ref tab v #f))) vars))
 
 (define (reduce-value internal-defines shadows px indefs)
-  (let ((vs (get-defines internal-defines (reverse (remove-duplicates (find-lets internal-defines shadows px indefs))))))
+  (let ((vs (get-defines internal-defines (remove-duplicates (reverse (find-lets internal-defines shadows px indefs))))))
     (make-letex vs px)))
 
 (define (assoc-append x1 x2)
