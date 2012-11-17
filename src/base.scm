@@ -382,6 +382,8 @@
 (define (parseobj-conv  lam x) (parseobj-mk (lam (parseobj-obj x)) (parseobj-propsid x)))
 (define (parseobj-convf lam) (lambda (x) (parseobj-conv lam x)))
 
+(define (parseobj-wrap x) (parseobj-mk x parseprops-null))
+
 ;;; TODO:
 ;;; A next step would be to automatically assign each object
 ;;; a unique properties entry given its position in the program (eg. left to right, back to front)
