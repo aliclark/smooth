@@ -282,7 +282,7 @@
 
 ;; The vs must be in an order such that each item does not depend on
 ;; the definition of a following item.
-(define (make-letex vs exp)
+(define (make-letex-deduping vs exp)
 
   ;; lets do the deduplication here instead of in another pass
   ;; That means we want to check if any vs are the same
@@ -457,7 +457,7 @@
                     ;; XXX: we don't really need to do a full reverse
                     ;; because expressions at different lambda levels
                     ;; cannot possibly reference each other
-                    (make-letex (reverse (car vs)) (car e))))
+                    (make-letex-deduping (reverse (car vs)) (car e))))
                 minref
                 minclos)
               (upwards (cadr vs)))
@@ -496,7 +496,7 @@
               (lambda (x)
                 (let ((e (dedup-extract x)))
                   ;; at this stage, all maxcounts should be #f
-                  (make-letex (reverse (cadr e)) (car e))))
+                  (make-letex-deduping (reverse (cadr e)) (car e))))
               px)
             px))
         xs))))
