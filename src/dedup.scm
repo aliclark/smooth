@@ -260,7 +260,7 @@
                   (car stuff)))
               (foldr (lambda (x acc) (subst acc x (macropobj to))) (cadr stuff) renames))))))))
 
-(define (make-letex-inner vs exp)
+(define (make-letex vs exp)
   (if (null? vs)
     exp
 
@@ -272,7 +272,7 @@
           (list
             (macropobj
               (list (macropobj '__lambda__) (macropobj (car va))
-                (make-letex-inner (cdr vs) exp)))
+                (make-letex (cdr vs) exp)))
             (cadr va)))))))
 
 ;; This is efficient enough for the global let-form of cat.smc,
@@ -339,7 +339,7 @@
                 (vs (car vsexp))
                 (exp (cadr vsexp)))
 
-          (make-letex-inner vs exp))))))
+          (make-letex vs exp))))))
 
 (define (reassemble-cond px flist fsym)
   (let ((x (parseobj-obj px)))
