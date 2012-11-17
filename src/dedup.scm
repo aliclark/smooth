@@ -139,8 +139,6 @@
 ;; notation unless we say they work in different namespaces
 ;; just have to make sure we don't define any vars with symbol [0-9]+
 
-(define (macropobj x) (parseobj-mk x parseprops-null))
-
 ;(define (points-to x)
 ;  (reserved-symbol-sym? px)
 
