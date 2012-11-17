@@ -227,12 +227,12 @@ chain as possible. Doing this minimises the number of times the expression is
 re-evaluated to what is absolutely necessary.
 
 -------------------------------------------------------------------------------
-Load into let-forms
-https://github.com/aliclark/smooth/tree/load-into-let
+Varexpand into let-forms
+https://github.com/aliclark/smooth/tree/varexpand-into-let
 
-Currently the load phase pastes expression values wherever they are
-used, leading to duplication. To fix this, values should be defined in
-a let-form surrounding the expressions that use it.
+Currently the varexpand phase pastes expression values wherever they
+are used, leading to duplication. To fix this, values should be
+defined in a let-form surrounding the expressions that use it.
 
 It does not matter so much if an expression is only used once, but for
 consistency and efficiency these should probably also be placed in
