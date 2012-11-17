@@ -492,6 +492,21 @@
 (define (lambda-expression-var x) (cadr (cadr x)))
 (define (lambda-expression-body x) (caddr x))
 
+(define (make-letex vs exp)
+  (if (null? vs)
+    exp
+
+    (if (and (= (length vs) 1) (eq? (caar vs) (parseobj-obj exp)))
+      (cadar vs)
+
+      (let ((va (car vs)))
+        (parseobj-wrap
+          (list
+            (parseobj-wrap
+              (list (parseobj-wrap '__lambda__) (parseobj-wrap (car va))
+                (make-letex (cdr vs) exp)))
+            (cadr va)))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (is-whitespace? c)
