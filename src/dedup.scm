@@ -252,11 +252,11 @@
                 (map
                   (lambda (v)
                     (list (car v)
-                      (subst-all (cadr v) renames (macropobj to))
+                      (subst-all (cadr v) renames (parseobj-wrap to))
                       (caddr v)
                       (cadddr v)))
                   (car stuff)))
-              (foldr (lambda (x acc) (subst acc x (macropobj to))) (cadr stuff) renames))))))))
+              (foldr (lambda (x acc) (subst acc x (parseobj-wrap to))) (cadr stuff) renames))))))))
 
 ;; This is efficient enough for the global let-form of cat.smc,
 ;; which has 133 expressions initially.
@@ -431,12 +431,12 @@
                 (minclos (map upward-globalising (cadddr e))))
 
           (list
-            (macropobj sym)
+            (parseobj-wrap sym)
 
             (cons
               (list sym
-                (macropobj
-                  (list (macropobj '__lambda__) (cadr x)
+                (parseobj-wrap
+                  (list (parseobj-wrap '__lambda__) (cadr x)
                     ;; XXX: we don't really need to do a full reverse
                     ;; because expressions at different lambda levels
                     ;; cannot possibly reference each other
@@ -462,8 +462,8 @@
                    (minref  (minrefcount  (caddr  e1) (caddr  e2)))
                    (minclos (merge-lists (cadddr e1) (cadddr e2))))
 
-              (list (macropobj sym)
-                (cons (list sym (macropobj (list (car e1) (car e2))) minref minclos) (append (cadr e1) (cadr e2)))
+              (list (parseobj-wrap sym)
+                (cons (list sym (parseobj-wrap (list (car e1) (car e2))) minref minclos) (append (cadr e1) (cadr e2)))
                 minref
                 minclos)))))
 
