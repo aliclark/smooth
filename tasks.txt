@@ -226,18 +226,6 @@ code, and secondly allow the expression to be evaluated as high up in the scope
 chain as possible. Doing this minimises the number of times the expression is
 re-evaluated to what is absolutely necessary.
 
--------------------------------------------------------------------------------
-Varexpand into let-forms
-https://github.com/aliclark/smooth/tree/varexpand-into-let
-
-Currently the varexpand phase pastes expression values wherever they
-are used, leading to duplication. To fix this, values should be
-defined in a let-form surrounding the expressions that use it.
-
-It does not matter so much if an expression is only used once, but for
-consistency and efficiency these should probably also be placed in
-let-forms.
-
 ===============================================================================
 Scratch notes
 
@@ -350,5 +338,16 @@ becomes
 
 {({({({a 1} {b 2} {({c 3} {d 4}) 5} {e 6}) 7} {({f 8} {g 9}) 10}) 11} {h 12}
 13)}
+
+-------------------------------------------------------------------------------
+Varexpand into let-forms
+
+Currently the varexpand phase pastes expression values wherever they
+are used, leading to duplication. To fix this, values should be
+defined in a let-form surrounding the expressions that use it.
+
+It does not matter so much if an expression is only used once, but for
+consistency and efficiency these should probably also be placed in
+let-forms.
 
 -------------------------------------------------------------------------------
