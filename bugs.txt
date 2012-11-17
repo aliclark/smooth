@@ -1,0 +1,15 @@
+
+These bugs are available for anyone to tackle in a topic branch.
+
+Please indicate if you are working on a bug.
+
+===============================================================================
+Open
+
+-------------------------------------------------------------------------------
+1: Property IDs are not updated on output
+
+If expressions have moved from their original position then we need to update
+the props table when outputting the code
+
+-------------------------------------------------------------------------------

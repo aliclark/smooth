@@ -5,12 +5,10 @@ Please indicate if you are working on a task.
 
 Note: the tasks are listed in no particular order.
 
-===
-
+===============================================================================
 Not started
 
----
-
+-------------------------------------------------------------------------------
 Create proper gensym objects
 
 Currently the code just uses things like __dNN__ or __xNN__ to create
@@ -23,8 +21,7 @@ is able to do a simple eq? for symbol equality.
 An alternative would be __genysm__d_NN__ but that would require special
 casing in the code which is not worth it.
 
----
-
+-------------------------------------------------------------------------------
 Separate debrujin notation
 
 Currently we use (__lambda__ __debrujin__ exp) to indicate debrujin
@@ -33,8 +30,7 @@ bugs to creep in.
 
 The new notation should be (__debrujin__ exp)
 
---- 
-
+-------------------------------------------------------------------------------
 Symbol strings
 
 Decide on a symbol syntax which allows all printable chars and possibly
@@ -75,8 +71,7 @@ Best just go with a standard string behaviour, with extra shortcuts
 like \n \t and \xFF93 and which uses pipe character for
 delimeters. This leaves quotation marks available for the end-user.
 
----
-
+-------------------------------------------------------------------------------
 Dearitisation
 
 Currently each application must be exactly one argument per function, and it is
@@ -86,8 +81,7 @@ The internals should continue to see it this way, but it would be nice to
 expose an extra pass to the user so they can write each application as a single
 functor with 0 or more arguments.
 
----
-
+-------------------------------------------------------------------------------
 Rearitisation
 
 We would like to ability to call external functions with more than 1 argument
@@ -99,8 +93,7 @@ wrapping each extern in a lambda of the correct arity. This guarantees that
 closures are formed only when needed, since they will be evaluated out at beta
 reduce time if possible.
 
----
-
+-------------------------------------------------------------------------------
 Closed expression lazy execution
 
 Currently the deduplication phase will also hoist out duplicated values from
@@ -114,8 +107,7 @@ function applications, so that if the closure is called again, we can return
 the value from the cache. In this way, only expressions that directly use the
 innermost variable will need to be recomputed.
 
----
-
+-------------------------------------------------------------------------------
 Optimistic evaluation
 
 We want to try to evaluate expressions within lambda expressions, using call by
@@ -132,8 +124,7 @@ The solution is to impose a time-bound on how long we spend evaluating
 expressions, and use a round-robin scheme so progress can be made on some
 expressions, even if others are not making progress.
 
----
-
+-------------------------------------------------------------------------------
 Asynchronous IO
 
 The interface for asynchronous IO is more restricted, in that one can implement
@@ -154,8 +145,7 @@ cpu: fork, exec, pipe and async io write to the process' stdin, async io read
 from its stdout. Define a native numcores() function to determine how many of
 these processes to spawn.
 
----
-
+-------------------------------------------------------------------------------
 Native code deduction
 
 It is likely that the output code will end up with lots of inefficient lambda
@@ -196,8 +186,7 @@ expressions at compile time.
 This task will likely share some ideas from the Generalised deduplications
 task, since both are about looking for patterns in lambda code.
 
----
-
+-------------------------------------------------------------------------------
 Generalised deduplications
 
 Detect patterns in code which can be deduplicated with respect to a function
@@ -207,8 +196,7 @@ slight amount, and automatically write a function to describe the similarity of
 code. Is this equivalent to checking whether two functions are equal? If so,
 it's not possible to implement fully.
 
----
-
+-------------------------------------------------------------------------------
 Module system
 
 The module system will follow a very similar concept to the current "define"
@@ -227,8 +215,7 @@ If it is desired to express imports over relative paths or URLs, or for both
 Windows and Unix, then an extra abstraction should be used to insert the
 correct paths at compile time.
 
----
-
+-------------------------------------------------------------------------------
 Caching build system
 
 A nice way to cache build results would be to only recompile if the SHA of the
@@ -245,14 +232,10 @@ symbols have been used, but it would also be necessary to keep track of places
 where unused source code have been removed, since they might not have been
 removed if they had been defined differently.
 
----
-
-===
-
+===============================================================================
 In progress
 
----
-
+-------------------------------------------------------------------------------
 Deduplication
 https://github.com/aliclark/smooth/tree/implement_dedup
 
@@ -265,32 +248,10 @@ code, and secondly allow the expression to be evaluated as high up in the scope
 chain as possible. Doing this minimises the number of times the expression is
 re-evaluated to what is absolutely necessary.
 
----
-
-Universal property encoding table
-https://github.com/aliclark/smooth/tree/parseprops-unified
-
-Compute the property IDs for each source expression on the fly based on the
-position that it appears in the source file.
-
-The ID's start at 1 with the innermost, leftmost symbol, then move along to the
-innermost rightmost, and so on.
-
-eg. ((a b (c d) e) (f g)) h
-
-becomes
-
-{({({({a 1} {b 2} {({c 3} {d 4}) 5} {e 6}) 7} {({f 8} {g 9}) 10}) 11} {h 12}
-13)}
-
----
-
-===
-
+===============================================================================
 Scratch notes
 
----
-
+-------------------------------------------------------------------------------
 Run-time strings at compile time
 
 Currently, there are two cases to date where evaluating code at compile time
@@ -311,8 +272,7 @@ One reason it might be a bad idea for the import pass is that we would normally
 like imports to be completely evaluated before macros can be evaluated in beta
 reduction.
 
----
-
+-------------------------------------------------------------------------------
 Are first class macros good? (probably yes)
 
 First class macros seem like a cool idea, and very elegantly solve the problem
@@ -352,14 +312,10 @@ intentially adds let-bindings for useful things like "let" and "mget".
  )
  (__import__ stdmodule.smc))
 
----
-
-===
-
+===============================================================================
 Not-goals
 
----
-
+-------------------------------------------------------------------------------
 Native code at compile time
 
 What happens if a macro lambda running at compile-time would like to use a
@@ -385,4 +341,34 @@ the cards. For this sort of behaviour we should revert to a very dumb
 mechanism of first having programs generate other Smooth files, then
 import'ing those at compile time.
 
----
+===============================================================================
+Done
+
+-------------------------------------------------------------------------------
+Universal property encoding table
+
+Compute the property IDs for each source expression on the fly based on the
+position that it appears in the source file.
+
+The ID's start at 1 with the innermost, leftmost symbol, then move along to the
+innermost rightmost, and so on.
+
+eg. ((a b (c d) e) (f g)) h
+
+becomes
+
+{({({({a 1} {b 2} {({c 3} {d 4}) 5} {e 6}) 7} {({f 8} {g 9}) 10}) 11} {h 12}
+13)}
+
+-------------------------------------------------------------------------------
+Varexpand into let-forms
+
+Currently the varexpand phase pastes expression values wherever they
+are used, leading to duplication. To fix this, values should be
+defined in a let-form surrounding the expressions that use it.
+
+It does not matter so much if an expression is only used once, but for
+consistency and efficiency these should probably also be placed in
+let-forms.
+
+-------------------------------------------------------------------------------

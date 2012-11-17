@@ -25,6 +25,7 @@
 ;;; would convert to:
 ;;;
 ;;; (__start__ ((__lambda__ x x) (__lambda__ x x)))
+;;; (__start__ ((__lambda__ foo (foo foo)) (__lambda__ x x)))
 ;;;
 ;;; Obviously this will not work if a symbol's value references itself.
 
@@ -32,29 +33,47 @@
 
 (define main-symbol 'main)
 
-(define (reduce-value internal-defines shadows px indefs)
+(define (find-lets internal-defines shadows px indefs)
   (let ((x (parseobj-obj px)))
     (if (list? x)
       (if (reserved-form-type? px '__lambda__ 3)
-        (parseobj-sel 2
-          (lambda (y)
-            (reduce-value internal-defines (cons (parseobj-obj (cadr x)) shadows) y indefs))
-          px)
+
+        (find-lets internal-defines (ensure-contains (parseobj-obj (cadr x)) shadows) (caddr x) indefs)
+
         (if (reserved-form-type? px '__extern__ 2)
-          px
-          (parseobj-mk
-            (p-map (lambda (z) (reduce-value internal-defines shadows z indefs)) x)
-            (parseobj-propsid px))))
+          '()
+          (apply append (p-map (lambda (z) (find-lets internal-defines shadows z indefs)) x))))
+
       (if (contains? shadows x)
-        px
+        '()
+
         (if (contains? indefs x)
           (begin (display x) (newline) 'error-in-definition-of-this-symbol)
+
           (let ((val (assoc-ref internal-defines x #f)))
             (if (eq? val #f)
               (begin
                 (die-gnose "Variable not defined: " px)
                 #f)
-              (reduce-value internal-defines p-null val (cons x indefs)))))))))
+
+              (cons x (find-lets internal-defines p-null val (cons x indefs))))))))))
+
+;; Must only remove subsequent duplicates
+(define (remove-duplicates-inner xs seen)
+  (if (null? xs)
+    '()
+    (let ((x (car xs)))
+      (if (contains? seen x)
+        (remove-duplicates-inner (cdr xs) seen)
+        (cons x (remove-duplicates-inner (cdr xs) (cons x seen)))))))
+
+(define (remove-duplicates xs) (remove-duplicates-inner xs '()))
+
+(define (get-defines tab vars) (map (lambda (v) (list v (assoc-ref tab v #f))) vars))
+
+(define (reduce-value internal-defines shadows px indefs)
+  (let ((vs (get-defines internal-defines (remove-duplicates (reverse (find-lets internal-defines shadows px indefs))))))
+    (make-letex vs px)))
 
 (define (assoc-append x1 x2)
   (if (null? x1)
