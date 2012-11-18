@@ -354,7 +354,15 @@
           px
 
           (if (reserved-symbol-obj? px)
-            px
+
+            ;;; FIXME: ugly !!!! change to proper gensyms.
+            (if (string=? (substring (symbol->string (parseobj-obj (car x))) 0 3) "__d")
+              (parseobj-map
+                (lambda (y)
+                  (decrement-closing y depth))
+                px)
+
+              px)
 
             (parseobj-map
               (lambda (y)
