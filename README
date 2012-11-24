@@ -44,7 +44,7 @@ Because lambda expressions are reduced at compile time:
 
 
 This project is still at an early stage, so the generated code is
-slow, and the error messages are nearly non-existent.
+slow and the error messages are nearly non-existent.
 
 The program src/comments.smc is written in the Smooth programming
 language (albeit in a very Scheme-like way).
