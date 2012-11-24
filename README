@@ -18,10 +18,10 @@ This language and compiler is different from others in that:
   independently. The intermediate code representation is always plain
   text.
 
-* The module system will be very, well, modular. It combines ideas
-  from Java's dependency injection for module dependencies, and
-  NodeJS/Javascript's notion of returning modules as first-class
-  language objects.
+* The module system is extremely modular. It combines ideas from
+  Java's dependency injection for module dependencies, and
+  Node.js/Javascript's notion of modules as first-class language
+  objects.
 
 * A key priority of the language design is that the output of the
   compiler should be tiny, even potentially without a dependency on
