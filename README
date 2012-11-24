@@ -54,5 +54,5 @@ of the project.
 
 Both the build script and code should give a starting point for
 writing code in the language now, but as the language grows it will
-start to look much less like Scheme code (and much more practicably
+start to look much less like Scheme code (and become more practicably
 useful to program in Smooth as opposed to any other language).
