@@ -14,7 +14,9 @@ This language and compiler is different from others in that:
 * The compiler will perform whole-program optimisation.
 
 * The compiler implementation is very modular, allowing language
-  features to be easily implemented, changed or tested independently.
+  features to be easily implemented, changed or tested
+  independently. The intermediate code representation is always plain
+  text.
 
 * The module system will be very, well, modular. It combines ideas
   from Java's dependency injection for module dependencies, and
