@@ -31,8 +31,8 @@ This language and compiler is different from others in that:
 Because lambda expressions are reduced at compile time:
 
 * It is possible to perform run-time type checking which actually runs
-  at compile time, thus allowing the language to be it's own
-  turing-complete static type system.
+  at compile time, thus allowing the language to be it's own Turing
+  complete static dependent type system.
 
 * There is no run-time cost to the module system in using first-class
   modules as inputs and outputs to other modules.
