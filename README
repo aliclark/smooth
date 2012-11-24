@@ -40,7 +40,7 @@ Because lambda expressions are reduced at compile time:
 * Macros are first-class during compile time. If any macros are
   unevaluated before run-time this will be flagged as an error. This
   means that macros can be supplied as dependencies to a module in the
-  same way as normal functions can.
+  same way as normal functions.
 
 
 This project is still at an early stage, so the generated code is
