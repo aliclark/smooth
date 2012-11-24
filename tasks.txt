@@ -45,9 +45,9 @@ Perhaps string-symbols must be written like so: (__symbol__ "content here...")
 There is still potential for confusion there if a user things they can make a
 macro synonym for __symbol__ to something like strsym.
 
-Best just go with a standard string behaviour, with extra shortcuts
-like \n \t and \xFF93 and which uses pipe character for
-delimeters. This leaves quotation marks available for the end-user.
+Best just go with a standard string behaviour, with extra shortcuts like \n \t
+and \xFF93 and which uses pipe character for delimeters. This leaves quotation
+marks available for the end-user.
 
 -------------------------------------------------------------------------------
 Dearitisation
@@ -112,12 +112,12 @@ asynchronous IO within a blocking IO interface.
 For this reason, asynchronous IO is how code is recommended to be written,
 especially since Smooth will never have threading. (Smooth will never have
 threading because A: threading is not simple, it is horrendously complex, and
-B: processes are a better way to express multi-tasking regardless.) 
+B: processes are a better way to express multi-tasking regardless.)
 
 IO should be performed asynchronously in an event loop, and computationally
 heavy tasks should be shoved off to another process.
 
-io:  poll, libev, or reimplement libev in Smooth
+io: poll, libev, or reimplement libev in Smooth
 
 cpu: fork, exec, pipe and async io write to the process' stdin, async io read
 from its stdout. Define a native numcores() function to determine how many of
@@ -181,8 +181,8 @@ The module system will follow a very similar concept to the current "define"
 style of naming that it replaces, in that all references to the defined
 name/module are directly replaced by the value it refers to.
 
-In the case of modules, the expression (import "/dir/filepath") is replaced directly
-by the single expression contained within the file "/dir/filepath".
+In the case of modules, the expression (import "/dir/filepath") is replaced
+directly by the single expression contained within the file "/dir/filepath".
 
 In this way, module is very much a misnomer, since the concept is generalised
 away from first class modules to first class expressions, and both (lambda x x)
@@ -214,8 +214,7 @@ removed if they had been defined differently.
 In progress
 
 -------------------------------------------------------------------------------
-Deduplication
-https://github.com/aliclark/smooth/tree/implement_dedup
+Deduplication https://github.com/aliclark/smooth/tree/implement_dedup
 
 Referential transparency allows us to see more clearly when expressions refer
 to the same values, since any expressions which are syntactically the same must
@@ -260,26 +259,24 @@ sufficient?
 The main hitch is that we cannot use a macro until we have loaded it into the
 current scope via __import__, and bound it to a symbol via __lambda__
 
-There is another niggle in that macros themselves use library
-functions, and those library functions can be more elegantly written
-using those macros.
+There is another niggle in that macros themselves use library functions, and
+those library functions can be more elegantly written using those macros.
 
-A good solution to that is the same as the one used to help write the
-Smooth compiler in Smooth - cache an output of an earlier compilation
-and use it for bootstrapping.
+A good solution to that is the same as the one used to help write the Smooth
+compiler in Smooth - cache an output of an earlier compilation and use it for
+bootstrapping.
 
-Not sure how to specify to use the cached version of the code, or
-whether the compiler should automatically used the cached version when
-it realises there is a cycle (how can we guarantee it is
-up-to-date?). Also prefer not to give file compilation preferential
-treatment to compilation of other strings.
+Not sure how to specify to use the cached version of the code, or whether the
+compiler should automatically used the cached version when it realises there is
+a cycle (how can we guarantee it is up-to-date?). Also prefer not to give file
+compilation preferential treatment to compilation of other strings.
 
-For the __import__ + __lambda__ problem, might need to rely on a
-read-syntax here, or a very primitive "module" macro provided by a
-separate macro system/pass.
+For the __import__ + __lambda__ problem, might need to rely on a read-syntax
+here, or a very primitive "module" macro provided by a separate macro
+system/pass.
 
-Here we have some boiler-plate, followed by a macro-call which
-intentially adds let-bindings for useful things like "let" and "mget".
+Here we have some boiler-plate, followed by a macro-call which intentially adds
+let-bindings for useful things like "let" and "mget".
 
 ((__lambda__ stdmodule
    (stdmodule (bool pair)
@@ -311,13 +308,13 @@ would be different monads.
 Is it a reasonable thing to want to pull a DB schema at macro time and generate
 the code for it?
 
-There is some level of disconnect trying to pass in an argument to a
-macro that needs to be evaluated at compile time.
+There is some level of disconnect trying to pass in an argument to a macro that
+needs to be evaluated at compile time.
 
-I think it may be best to say that non-pure first-class macros are off
-the cards. For this sort of behaviour we should revert to a very dumb
-mechanism of first having programs generate other Smooth files, then
-import'ing those at compile time.
+I think it may be best to say that non-pure first-class macros are off the
+cards. For this sort of behaviour we should revert to a very dumb mechanism of
+first having programs generate other Smooth files, then import'ing those at
+compile time.
 
 ===============================================================================
 Done
@@ -341,12 +338,11 @@ becomes
 -------------------------------------------------------------------------------
 Varexpand into let-forms
 
-Currently the varexpand phase pastes expression values wherever they
-are used, leading to duplication. To fix this, values should be
-defined in a let-form surrounding the expressions that use it.
+Currently the varexpand phase pastes expression values wherever they are used,
+leading to duplication. To fix this, values should be defined in a let-form
+surrounding the expressions that use it.
 
 It does not matter so much if an expression is only used once, but for
-consistency and efficiency these should probably also be placed in
-let-forms.
+consistency and efficiency these should probably also be placed in let-forms.
 
 -------------------------------------------------------------------------------
